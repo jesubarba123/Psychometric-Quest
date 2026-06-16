@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.DS_Store
+
+psychometric-quest-source.md
+exports/
+.agents/
+skills-lock.json
+.claude/
