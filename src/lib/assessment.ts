@@ -82,11 +82,46 @@ export function calculateBigFive(answers: Record<string, number>): BigFiveResult
   return { domains, answeredAt: new Date().toISOString(), inconsistency };
 }
 
+// Arquetipos conductuales definidos por su FIRMA: qué ejes destacan (+) o se
+// hunden (-) respecto al promedio del propio candidato. Clasificamos por la
+// forma del perfil, no por umbrales absolutos, para evitar que la mayoría caiga
+// en un fallback. Los ejes son [adaptability, prioritization, executiveControl,
+// calculatedRisk]. Las firmas se normalizan a vector unitario para comparar de
+// forma justa entre arquetipos. Los nombres originales se conservan para que los
+// candidatos ya evaluados sigan siendo miembros válidos de la taxonomía.
+const BEHAVIORAL_ARCHETYPES: { name: string; signature: [number, number, number, number] }[] = [
+  { name: "Explorador calibrado", signature: [1, 0, 0, 1] },   // adaptabilidad + riesgo calculado
+  { name: "Operador estratégico", signature: [0, 1, 1, 0] },   // priorización + control ejecutivo
+  { name: "Arquitecto cauteloso", signature: [0, 0, 1, -1] },  // control ejecutivo + aversión al riesgo
+  { name: "Estratega adaptativo", signature: [1, 1, 0, 0] },   // adaptabilidad + priorización
+  { name: "Ejecutor resiliente", signature: [1, 0, 1, 0] },    // adaptabilidad + control ejecutivo
+];
+
+// Por debajo de esta dispersión (desviación estándar de los 4 ejes, en puntos
+// 0–100) consideramos el perfil "plano": ningún eje domina con claridad.
+const BALANCED_SPREAD_THRESHOLD = 7;
+
 function chooseProfile(scores: Omit<BehavioralScores, "profile">) {
-  if (scores.adaptability >= 72 && scores.calculatedRisk >= 62) return "Explorador calibrado";
-  if (scores.prioritization >= 74 && scores.executiveControl >= 68) return "Operador estratégico";
-  if (scores.executiveControl >= 74 && scores.calculatedRisk < 56) return "Arquitecto cauteloso";
-  return "Resolvedor situacional";
+  const axes = [scores.adaptability, scores.prioritization, scores.executiveControl, scores.calculatedRisk];
+  const mean = average(axes);
+  const deviation = axes.map((value) => value - mean);
+  const spread = Math.sqrt(average(deviation.map((d) => d * d)));
+
+  // Perfil equilibrado: sin un eje dominante, es genuinamente situacional.
+  if (spread < BALANCED_SPREAD_THRESHOLD) return "Resolvedor situacional";
+
+  let best = BEHAVIORAL_ARCHETYPES[0].name;
+  let bestScore = -Infinity;
+  for (const archetype of BEHAVIORAL_ARCHETYPES) {
+    const norm = Math.hypot(...archetype.signature) || 1;
+    // Proyección de la forma del candidato sobre la firma unitaria del arquetipo.
+    const projection = archetype.signature.reduce((sum, weight, i) => sum + weight * deviation[i], 0) / norm;
+    if (projection > bestScore) {
+      bestScore = projection;
+      best = archetype.name;
+    }
+  }
+  return best;
 }
 
 function average(values: number[]) {
