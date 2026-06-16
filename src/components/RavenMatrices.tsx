@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { AURORA } from "../utils/palette";
 import "./RavenMatrices.css";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ interface Cell { shape: ShapeId; count: number; color: string; rotation: number 
 interface Item { grid: Cell[]; options: Cell[]; answer: number; }
 
 const SHAPES: ShapeId[] = ["circle", "square", "triangle", "diamond"];
-const COLORS = ["#4ecdc4", "#e8a94a", "#6aa8ff"];
+const COLORS = [AURORA.signal, AURORA.amber, AURORA.blue];
 const ROTATIONS = [0, 45, 90];
 
 const REAL_ITEMS = 6;
@@ -71,7 +72,13 @@ function genItem(difficulty: number): Item {
     if (!cellEq(t, correct) && !distractors.some((d) => cellEq(d, t))) distractors.push(t);
     if (distractors.length >= 5) break;
   }
-  while (distractors.length < 5) {
+  // M2 — add an iteration cap; if the random search hasn't found 5 unique
+  //      distractors within MAX_ATTEMPTS, fall through with however many we have
+  //      (the tries[] block above guarantees at least 3–4 in practice).
+  const MAX_ATTEMPTS = 120;
+  let attempts = 0;
+  while (distractors.length < 5 && attempts < MAX_ATTEMPTS) {
+    attempts++;
     const t: Cell = { shape: sample(SHAPES), count: 1 + Math.floor(Math.random() * 3), color: sample(COLORS), rotation: sample(ROTATIONS) };
     if (!cellEq(t, correct) && !distractors.some((d) => cellEq(d, t))) distractors.push(t);
   }

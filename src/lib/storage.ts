@@ -1,3 +1,4 @@
+import { isSupabaseConfigured } from "./supabaseClient";
 import type { Candidate, JobPosition } from "../types";
 
 const KEY = "signal-run-platform-v3";
@@ -9,6 +10,8 @@ type Database = {
 
 const now = () => new Date().toISOString();
 
+// A2 — use fixed ISO dates so demo data does not contaminate time-based metrics
+//      (e.g. recency filters, decay curves, or "days since" calculations).
 const seed: Database = {
   positions: [
     {
@@ -18,7 +21,7 @@ const seed: Database = {
       location: "Remoto",
       status: "open",
       jd: "Buscamos una persona analítica para mejorar procesos de producto, operaciones, dashboards, métricas, priorización, coordinación cross-functional, documentación, SQL básico y comunicación con stakeholders.",
-      createdAt: now(),
+      createdAt: "2026-01-10T09:00:00.000Z",
     },
     {
       id: "pos-cs-lead",
@@ -27,7 +30,7 @@ const seed: Database = {
       location: "Híbrido",
       status: "open",
       jd: "Liderar cartera de clientes, onboarding, soporte consultivo, análisis de salud de cuentas, retención, comunicación ejecutiva, coordinación con producto y mejora continua de experiencia del cliente.",
-      createdAt: now(),
+      createdAt: "2026-01-10T09:00:00.000Z",
     },
   ],
   candidates: [
@@ -39,7 +42,7 @@ const seed: Database = {
       positionId: "pos-product-ops",
       invitationCode: "DEMO-2026",
       status: "invited",
-      createdAt: now(),
+      createdAt: "2026-01-15T10:00:00.000Z",
       events: [],
     },
     {
@@ -50,8 +53,8 @@ const seed: Database = {
       positionId: "pos-cs-lead",
       invitationCode: "MATEO-51",
       status: "completed",
-      createdAt: now(),
-      completedAt: now(),
+      createdAt: "2026-01-15T10:00:00.000Z",
+      completedAt: "2026-01-16T14:30:00.000Z",
       consentAccepted: true,
       behavioral: {
         adaptability: 82,
@@ -60,7 +63,7 @@ const seed: Database = {
         calculatedRisk: 64,
         profile: "Operador estratégico",
       },
-      personality: { domains: { O: 64, C: 78, E: 55, A: 82, N: 38 }, answeredAt: now(), inconsistency: 12 },
+      personality: { domains: { O: 64, C: 78, E: 55, A: 82, N: 38 }, answeredAt: "2026-01-16T14:25:00.000Z", inconsistency: 12 },
       events: [],
     },
     {
@@ -71,11 +74,11 @@ const seed: Database = {
       positionId: "pos-product-ops",
       invitationCode: "ANA-72",
       status: "completed",
-      createdAt: now(),
-      completedAt: now(),
+      createdAt: "2026-01-17T09:00:00.000Z",
+      completedAt: "2026-01-18T11:00:00.000Z",
       consentAccepted: true,
-      behavioral: { adaptability: 91, prioritization: 63, executiveControl: 66, calculatedRisk: 81, profile: "Explorador experimental" },
-      personality: { domains: { O: 81, C: 60, E: 72, A: 49, N: 44 }, answeredAt: now(), inconsistency: 18 },
+      behavioral: { adaptability: 91, prioritization: 63, executiveControl: 66, calculatedRisk: 81, profile: "Explorador calibrado" },
+      personality: { domains: { O: 81, C: 60, E: 72, A: 49, N: 44 }, answeredAt: "2026-01-18T10:55:00.000Z", inconsistency: 18 },
       events: [],
     },
     {
@@ -86,11 +89,11 @@ const seed: Database = {
       positionId: "pos-product-ops",
       invitationCode: "LUC-88",
       status: "completed",
-      createdAt: now(),
-      completedAt: now(),
+      createdAt: "2026-01-19T08:30:00.000Z",
+      completedAt: "2026-01-20T10:15:00.000Z",
       consentAccepted: true,
       behavioral: { adaptability: 61, prioritization: 88, executiveControl: 84, calculatedRisk: 38, profile: "Operador estratégico" },
-      personality: { domains: { O: 58, C: 84, E: 47, A: 66, N: 33 }, answeredAt: now(), inconsistency: 9 },
+      personality: { domains: { O: 58, C: 84, E: 47, A: 66, N: 33 }, answeredAt: "2026-01-20T10:10:00.000Z", inconsistency: 9 },
       events: [],
     },
     {
@@ -101,11 +104,11 @@ const seed: Database = {
       positionId: "pos-product-ops",
       invitationCode: "DIE-34",
       status: "completed",
-      createdAt: now(),
-      completedAt: now(),
+      createdAt: "2026-01-21T13:00:00.000Z",
+      completedAt: "2026-01-22T15:45:00.000Z",
       consentAccepted: true,
-      behavioral: { adaptability: 78, prioritization: 57, executiveControl: 59, calculatedRisk: 68, profile: "Creador adaptable" },
-      personality: { domains: { O: 70, C: 55, E: 63, A: 71, N: 52 }, answeredAt: now(), inconsistency: 21 },
+      behavioral: { adaptability: 78, prioritization: 57, executiveControl: 59, calculatedRisk: 68, profile: "Explorador calibrado" },
+      personality: { domains: { O: 70, C: 55, E: 63, A: 71, N: 52 }, answeredAt: "2026-01-22T15:40:00.000Z", inconsistency: 21 },
       events: [],
     },
   ],
@@ -196,12 +199,35 @@ export function createCandidateAccount(input: {
   name: string;
   email: string;
   phone?: string;
-  password?: string;
+  // B2 — `password` (plaintext) param removed; callers must hash before calling.
   passwordDigest?: string;
   provider?: Candidate["authProvider"];
   roleTarget?: string;
   positionId?: string;
 }) {
+  // A4 — when Supabase is active, auth/profile management is handled server-side;
+  //      writing to localStorage would duplicate records.
+  if (isSupabaseConfigured) {
+    // Return a minimal in-memory stub so callers don't crash. The actual
+    // candidate record lives in Supabase and is loaded via onAuthStateChange.
+    return {
+      id: crypto.randomUUID(),
+      name: input.name.trim(),
+      email: input.email.trim(),
+      phone: input.phone?.trim(),
+      roleTarget: input.roleTarget?.trim() || "Proceso abierto",
+      positionId: input.positionId,
+      invitationCode: "",
+      authProvider: input.provider ?? "email",
+      passwordCreated: Boolean(input.passwordDigest),
+      accountCreatedAt: now(),
+      status: "invited" as const,
+      createdAt: now(),
+      loginCount: 0,
+      events: [],
+    };
+  }
+
   const code = `SELF-${Math.floor(10000 + Math.random() * 89999)}`;
   const existing = loadDatabase().candidates.find((candidate) => candidate.email.toLowerCase() === input.email.trim().toLowerCase());
   if (existing) {
@@ -210,7 +236,9 @@ export function createCandidateAccount(input: {
       name: input.name.trim() || existing.name,
       phone: input.phone?.trim() || existing.phone,
       authProvider: input.provider ?? existing.authProvider ?? "email",
-      passwordCreated: Boolean(input.password || input.passwordDigest) || existing.passwordCreated,
+      passwordCreated: Boolean(input.passwordDigest) || existing.passwordCreated,
+      // C2 — passwordDigest is persisted locally for offline auth; it is
+      //      intentionally excluded from exportJson/exportCsv (see those fns).
       passwordDigest: input.passwordDigest ?? existing.passwordDigest,
       accountCreatedAt: existing.accountCreatedAt ?? now(),
       positionId: input.positionId ?? existing.positionId,
@@ -228,7 +256,8 @@ export function createCandidateAccount(input: {
     positionId: input.positionId,
     invitationCode: code,
     authProvider: input.provider ?? "email",
-    passwordCreated: Boolean(input.password || input.passwordDigest),
+    passwordCreated: Boolean(input.passwordDigest),
+    // C2 — see note above; excluded from exports below.
     passwordDigest: input.passwordDigest,
     accountCreatedAt: now(),
     status: "invited",
@@ -279,8 +308,17 @@ export function attachCandidateInvitation(account: Candidate, code: string) {
   return merged;
 }
 
+// C2 — strip passwordDigest before any export so credential hashes never leave the app.
+function stripSensitiveFields(candidate: Candidate): Omit<Candidate, "passwordDigest"> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { passwordDigest: _omit, ...safe } = candidate;
+  return safe;
+}
+
 export function exportJson() {
-  return JSON.stringify(loadDatabase(), null, 2);
+  const db = loadDatabase();
+  const safe = { ...db, candidates: db.candidates.map(stripSensitiveFields) };
+  return JSON.stringify(safe, null, 2);
 }
 
 export function exportCsv() {

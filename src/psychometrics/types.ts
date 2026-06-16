@@ -19,6 +19,9 @@ export type FrogRiskMetrics = {
   meanRisk: number;
   riskStdDev: number;
   lossResilience: number;
+  // B5 — when the player never failed, lossResilience defaults to 50 (neutral).
+  //      hasFailures=false signals that the value should not be shown as meaningful.
+  hasFailures: boolean;
   postFailureDelta: number[];
   riskAfterFailure: "reduces" | "maintains" | "escalates";
   decisionQuality: number;

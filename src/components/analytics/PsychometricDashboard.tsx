@@ -6,6 +6,7 @@ import { PostFailureArrowChart } from "./PostFailureArrowChart";
 import { RadarProfileChart } from "./RadarProfileChart";
 import { RiskHeatmapChart } from "./RiskHeatmapChart";
 import { RtDistributionChart } from "./RtDistributionChart";
+import { SEMANTIC } from "../../utils/palette";
 import "./PsychometricDashboard.css";
 
 type Props = {
@@ -72,7 +73,8 @@ export function PsychometricDashboard({ profile, frogChoices, audience }: Props)
             <PostFailureArrowChart metrics={frog} />
             <div className="analytics-metric-grid two">
               <MetricCard label="Tras un fallo" value={failureLabel(frog.riskAfterFailure)} color={failureColor(frog.riskAfterFailure)} />
-              <MetricCard label="Resiliencia" value={`${frog.lossResilience}/100`} color={scoreColor(frog.lossResilience)} />
+              {/* B5 — suppress lossResilience when no failure occurred (value is meaningless 50) */}
+              <MetricCard label="Resiliencia" value={frog.hasFailures ? `${frog.lossResilience}/100` : "Sin fallos"} color={frog.hasFailures ? scoreColor(frog.lossResilience) : undefined} />
             </div>
           </ChartCard>
         </>
@@ -136,9 +138,9 @@ function signed(value: number) {
 }
 
 function scoreColor(value: number) {
-  if (value >= 70) return "#5cb88a";
-  if (value >= 40) return "#e8a94a";
-  return "#e05c5c";
+  if (value >= 70) return SEMANTIC.good;
+  if (value >= 40) return SEMANTIC.warn;
+  return SEMANTIC.bad;
 }
 
 function decisionProfileLabel(value: string) {
@@ -148,9 +150,9 @@ function decisionProfileLabel(value: string) {
 }
 
 function profileColor(value: string) {
-  if (value === "balanced") return "#5cb88a";
-  if (value === "reckless") return "#e05c5c";
-  return "#e8a94a";
+  if (value === "balanced") return SEMANTIC.good;
+  if (value === "reckless") return SEMANTIC.bad;
+  return SEMANTIC.warn;
 }
 
 function failureLabel(value: string) {
@@ -160,9 +162,9 @@ function failureLabel(value: string) {
 }
 
 function failureColor(value: string) {
-  if (value === "reduces") return "#5cb88a";
-  if (value === "escalates") return "#e05c5c";
-  return "#e8a94a";
+  if (value === "reduces") return SEMANTIC.good;
+  if (value === "escalates") return SEMANTIC.bad;
+  return SEMANTIC.warn;
 }
 
 function fatigueLabel(value: string) {
@@ -172,9 +174,9 @@ function fatigueLabel(value: string) {
 }
 
 function fatigueColor(value: string) {
-  if (value === "stable") return "#5cb88a";
-  if (value === "mild_decay") return "#e8a94a";
-  return "#e05c5c";
+  if (value === "stable") return SEMANTIC.good;
+  if (value === "mild_decay") return SEMANTIC.warn;
+  return SEMANTIC.bad;
 }
 
 function consistencyLabel(value: string) {
@@ -184,9 +186,9 @@ function consistencyLabel(value: string) {
 }
 
 function consistencyColor(value: string) {
-  if (value === "consistent") return "#5cb88a";
-  if (value === "moderate") return "#e8a94a";
-  return "#e05c5c";
+  if (value === "consistent") return SEMANTIC.good;
+  if (value === "moderate") return SEMANTIC.warn;
+  return SEMANTIC.bad;
 }
 
 function impulsivityLabel(value: string) {
@@ -196,7 +198,7 @@ function impulsivityLabel(value: string) {
 }
 
 function impulsivityColor(value: string) {
-  if (value === "low") return "#5cb88a";
-  if (value === "moderate") return "#e8a94a";
-  return "#e05c5c";
+  if (value === "low") return SEMANTIC.good;
+  if (value === "moderate") return SEMANTIC.warn;
+  return SEMANTIC.bad;
 }

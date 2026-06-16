@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { SignalSurgeMetrics } from "../../psychometrics/types";
+import { AURORA, STRUCTURE } from "../../utils/palette";
 
 const BUCKETS = ["200-400", "400-600", "600-800", "800+"];
 
@@ -32,21 +33,21 @@ export function RtDistributionChart({ metrics }: Props) {
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(216,232,228,.08)" vertical={false} />
-          <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "#7a9898" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#7a9898" }} axisLine={false} tickLine={false} width={36} allowDecimals={false} />
+          <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: STRUCTURE.muted }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: STRUCTURE.muted }} axisLine={false} tickLine={false} width={36} allowDecimals={false} />
           <Tooltip
             contentStyle={{
-              background: "#161d24",
-              border: "1px solid #2a3a48",
+              background: STRUCTURE.surface,
+              border: `1px solid ${STRUCTURE.line}`,
               borderRadius: 8,
-              color: "#d8e8e4",
+              color: STRUCTURE.ink,
               fontSize: 12,
             }}
             formatter={(value) => [value, "Hits"]}
           />
           <Bar dataKey="total" radius={[5, 5, 0, 0]}>
             {data.map((entry) => (
-              <Cell key={entry.bucket} fill={entry.bucket === medianBucket ? "#4ecdc4" : "rgba(78,205,196,.38)"} />
+              <Cell key={entry.bucket} fill={entry.bucket === medianBucket ? AURORA.signal : "rgba(78,205,196,.38)"} />
             ))}
           </Bar>
         </BarChart>

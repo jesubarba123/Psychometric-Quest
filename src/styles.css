@@ -1667,6 +1667,13 @@ body {
 
 .candidate-row { cursor: pointer; transition: background .14s; }
 .candidate-row:hover { background: rgba(78,205,196,.06); }
+/* Foco de teclado para filas accionables (role=button) — anillo interior limpio */
+.candidate-row:focus-visible,
+.rank-row:focus-visible {
+  outline: none;
+  background: rgba(78,205,196,.1);
+  box-shadow: inset 0 0 0 2px rgba(78,205,196,.7);
+}
 
 .detail-head { display: flex; gap: 18px; align-items: center; margin: 18px 0 8px; }
 .detail-photo {
@@ -1961,7 +1968,8 @@ body {
 .skill-chip button:hover { opacity: 1; }
 .field-hint { color: var(--muted); font-size: 12px; }
 
-/* ── Encuesta Jung (formato escala visual paginado) ──────────── */
+/* ── Cuestionario de personalidad Big Five (escala visual paginada)
+      (clases .jung-* conservadas por compatibilidad con el markup) ── */
 .jung-survey { display: grid; gap: 4px; max-width: 760px; margin-left: auto; margin-right: auto; }
 .jung-head {
   position: sticky;

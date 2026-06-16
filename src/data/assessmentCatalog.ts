@@ -101,10 +101,17 @@ export function enabledAssessmentsFor(enabled?: string[]): string[] {
   return valid.length ? ALL_ASSESSMENT_KEYS.filter((k) => valid.includes(k)) : ALL_ASSESSMENT_KEYS;
 }
 
+// Minimum route_choice events required to consider route_risk complete.
+// The catalog lists 6 rounds; a single event could be a stray click, not a full session.
+const ROUTE_RISK_MIN_EVENTS = 6;
+
 // ¿El candidato completó una prueba? (personalidad por su campo; juegos por su evento)
 export function isAssessmentDone(candidate: Candidate, key: string): boolean {
   if (key === "personality") return Boolean(candidate.personality);
   const meta = assessmentMap[key];
   if (!meta) return false;
-  return (candidate.events ?? []).some((event) => event.type === meta.eventType);
+  const matching = (candidate.events ?? []).filter((event) => event.type === meta.eventType);
+  // M4 — route_risk requires a full session (≥6 route_choice events), not just one.
+  if (key === "route_risk") return matching.length >= ROUTE_RISK_MIN_EVENTS;
+  return matching.length > 0;
 }

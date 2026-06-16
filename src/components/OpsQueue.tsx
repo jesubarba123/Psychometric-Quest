@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AURORA, SEMANTIC } from "../utils/palette";
 import "./OpsQueue.css";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ const Pips: React.FC<{ value: number; tone: string }> = ({ value, tone }) => (
   </span>
 );
 
-const urgencyTone = (u: number) => (u >= 5 ? "#e05c5c" : u >= 4 ? "#e8a94a" : "#5cb88a");
+const urgencyTone = (u: number) => (u >= 5 ? SEMANTIC.bad : u >= 4 ? SEMANTIC.warn : SEMANTIC.good);
 
 // ─── Resultados ────────────────────────────────────────────────────────────────
 
@@ -108,9 +109,9 @@ const Intro: React.FC<{ onStart: () => void }> = ({ onStart }) => (
       <strong> urgencia</strong> real y <strong>esfuerzo</strong> razonable. Solo puedes atender uno.
     </p>
     <div className="oq-legend">
-      <span><i style={{ background: "#6aa8ff" }} /> Impacto</span>
-      <span><i style={{ background: "#e8a94a" }} /> Urgencia</span>
-      <span><i style={{ background: "#7a9898" }} /> Esfuerzo</span>
+      <span><i style={{ background: AURORA.blue }} /> Impacto</span>
+      <span><i style={{ background: AURORA.amber }} /> Urgencia</span>
+      <span><i style={{ background: AURORA.muted }} /> Esfuerzo</span>
     </div>
     <button className="oq-start-btn" onClick={onStart} autoFocus>Comenzar</button>
   </div>
@@ -203,9 +204,9 @@ const OpsQueue: React.FC<OpsQueueProps> = ({ practice = false, onComplete, onCon
                     {picked !== null && i === best && <span className="oq-best-tag">óptimo ✓</span>}
                   </div>
                   <h3 className="oq-ticket-title">{t.title}</h3>
-                  <div className="oq-metric"><span>Impacto</span><Pips value={t.impact} tone="#6aa8ff" /></div>
-                  <div className="oq-metric"><span>Urgencia</span><Pips value={t.urgency} tone="#e8a94a" /></div>
-                  <div className="oq-metric"><span>Esfuerzo</span><Pips value={t.effort} tone="#7a9898" /></div>
+                  <div className="oq-metric"><span>Impacto</span><Pips value={t.impact} tone={AURORA.blue} /></div>
+                  <div className="oq-metric"><span>Urgencia</span><Pips value={t.urgency} tone={AURORA.amber} /></div>
+                  <div className="oq-metric"><span>Esfuerzo</span><Pips value={t.effort} tone={AURORA.muted} /></div>
                 </button>
               );
             })}

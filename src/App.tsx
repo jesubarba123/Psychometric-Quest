@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { bigFiveQuestions, bigFiveDomains, bigFiveDomainMap, BIG_FIVE_SCALE, type BigFiveDomainKey } from "./data/bigfive";
 import { assessmentCatalog, assessmentMap, enabledAssessmentsFor, isAssessmentDone, ALL_ASSESSMENT_KEYS } from "./data/assessmentCatalog";
 import { calculateBigFive, calculateBehavioral, downloadFile, gameEvent } from "./lib/assessment";
@@ -20,7 +20,7 @@ import { extractCvText } from "./utils/cvParse";
 import type { Candidate, CandidateOutcome, CvMatchResult, EnglishLevel, GameEvent, HiringDecision, JobPosition, Role } from "./types";
 
 const APP_NAME = "Psychometric Quest";
-const APP_TAGLINE = "Juegos conductuales + arquetipos Jung";
+const APP_TAGLINE = "Juegos conductuales + personalidad Big Five";
 const APP_LOGO = "/psychometric-quest-logo.png";
 
 type Screen = "login" | "intro" | "profile" | "cv-match" | "access-code" | "consent" | "assessments" | "candidate-report" | "admin";
@@ -37,11 +37,13 @@ export function App() {
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [dbVersion, setDbVersion] = useState(0);
 
+  // A1 — mount-only; the internal `role` check prevents double-enter if the
+  // auth state fires while a session is already active.
   useEffect(() => {
     if (!supabase) return;
 
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user && !role) {
+      if (data.session?.user) {
         enterCandidate(candidateFromSupabaseUser(data.session.user));
       }
     });
@@ -51,7 +53,8 @@ export function App() {
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function refresh() {
     setDbVersion((value) => value + 1);
@@ -138,6 +141,7 @@ function journeyProgress(screen: Screen, candidate: Candidate | null) {
   if (screen === "login") return 7;
   if (screen === "intro") return 14;
   if (screen === "profile") return 22;
+  if (screen === "cv-match") return 30;   // A3 — was missing, fell through to 10 (< login)
   if (screen === "access-code") return 38;
   if (screen === "consent") return 50;
   if (screen === "assessments") return 74;
@@ -249,11 +253,11 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
           </div>
           <h1>Tu próximo rol<br />empieza por conocerte.</h1>
           <p className="lead">
-            Juegos conductuales y arquetipos Jung que revelan cómo decides, te adaptas y priorizas — en una sola sesión.
+            Juegos conductuales y un perfil de personalidad Big Five que revelan cómo decides, te adaptas y priorizas — en una sola sesión.
           </p>
           <div className="hero-meta">
             <span>5 juegos conductuales</span>
-            <span>12 arquetipos Jung</span>
+            <span>5 dimensiones Big Five</span>
             <span>Reporte PDF</span>
           </div>
         </div>
@@ -282,11 +286,11 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
               </div>
               <div className="login-divider"><span>o crea una cuenta</span></div>
               <div className="form-stack">
-                <input placeholder="Nombre completo" value={signup.name} onChange={(event) => setSignup({ ...signup, name: event.target.value })} />
-                <input placeholder="Correo" value={signup.email} onChange={(event) => setSignup({ ...signup, email: event.target.value })} />
-                <input placeholder="Teléfono" value={signup.phone} onChange={(event) => setSignup({ ...signup, phone: event.target.value })} />
-                <input placeholder="Contraseña" type="password" value={signup.password} onChange={(event) => setSignup({ ...signup, password: event.target.value })} />
-                <input placeholder="Repite tu contraseña" type="password" value={signup.confirmPassword} onChange={(event) => setSignup({ ...signup, confirmPassword: event.target.value })} />
+                <input aria-label="Nombre completo" autoComplete="name" placeholder="Nombre completo" value={signup.name} onChange={(event) => setSignup({ ...signup, name: event.target.value })} />
+                <input aria-label="Correo" type="email" autoComplete="email" placeholder="Correo" value={signup.email} onChange={(event) => setSignup({ ...signup, email: event.target.value })} />
+                <input aria-label="Teléfono" type="tel" autoComplete="tel" placeholder="Teléfono" value={signup.phone} onChange={(event) => setSignup({ ...signup, phone: event.target.value })} />
+                <input aria-label="Contraseña" placeholder="Contraseña" type="password" autoComplete="new-password" value={signup.password} onChange={(event) => setSignup({ ...signup, password: event.target.value })} />
+                <input aria-label="Repite tu contraseña" placeholder="Repite tu contraseña" type="password" autoComplete="new-password" value={signup.confirmPassword} onChange={(event) => setSignup({ ...signup, confirmPassword: event.target.value })} />
                 <button className="button" onClick={submitSignup}>Crear cuenta y continuar</button>
               </div>
             </>
@@ -295,18 +299,21 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
               <button className="auth-toggle muted-toggle" onClick={() => { setAuthMode("create"); setError(""); }}>Crear una cuenta nueva</button>
               <div className="login-divider"><span>cuenta existente</span></div>
               <div className="form-stack">
-                <input placeholder="Correo" value={signin.email} onChange={(event) => setSignin({ ...signin, email: event.target.value })} />
-                <input placeholder="Contraseña" type="password" value={signin.password} onChange={(event) => setSignin({ ...signin, password: event.target.value })} />
+                <input aria-label="Correo" type="email" autoComplete="email" placeholder="Correo" value={signin.email} onChange={(event) => setSignin({ ...signin, email: event.target.value })} />
+                <input aria-label="Contraseña" placeholder="Contraseña" type="password" autoComplete="current-password" value={signin.password} onChange={(event) => setSignin({ ...signin, password: event.target.value })} />
                 <button className="button" onClick={submitSignin}>Ingresar</button>
               </div>
             </>
           )}
         </div>
         {error && <p className="error">{error}</p>}
-        <div className="admin-login-strip">
-          <span>Acceso administrador demo</span>
-          <button className="button secondary" onClick={onAdmin}>Entrar como admin</button>
-        </div>
+        {/* C3 — only show demo admin bypass when Supabase is NOT configured */}
+        {!isSupabaseConfigured && (
+          <div className="admin-login-strip">
+            <span>Acceso administrador demo</span>
+            <button className="button secondary" onClick={onAdmin}>Entrar como admin</button>
+          </div>
+        )}
         </div>
       </div>
     </section>
@@ -335,7 +342,7 @@ function CandidateIntro({ candidate, onContinue }: { candidate: Candidate; onCon
           <button className="button intro-cta" onClick={onContinue}>Continuar a perfil y CV</button>
           <div className="hero-meta">
             <span>Exploración conductual</span>
-            <span>5 juegos · 12 arquetipos</span>
+            <span>5 juegos · Big Five</span>
             <span>Reporte PDF</span>
           </div>
         </div>
@@ -369,8 +376,8 @@ function CandidateIntro({ candidate, onContinue }: { candidate: Candidate; onCon
           <p>Cinco juegos cortos miden flexibilidad, memoria de trabajo, atención, priorización y riesgo calculado.</p>
         </article>
         <article>
-          <h3>Arquetipo y reporte</h3>
-          <p>Respondes el arquetipado Jung y recibes un reporte PDF con tu perfil individual, sin compararte con otros.</p>
+          <h3>Personalidad y reporte</h3>
+          <p>Respondes el cuestionario de personalidad Big Five y recibes un reporte PDF con tu perfil individual, sin compararte con otros.</p>
         </article>
       </section>
     </>
@@ -648,10 +655,10 @@ function Consent({ candidate, onAccept }: { candidate: Candidate; onAccept: (can
       <p className="eyebrow">Consentimiento</p>
       <h1>Hola, {candidate.name}.</h1>
       <p className="lead">
-        Esta experiencia registra decisiones, tiempos de respuesta y respuestas de arquetipado para generar insights de talento. No es diagnóstico clínico ni debe usarse como decisión única de selección.
+        Esta experiencia registra decisiones, tiempos de respuesta y respuestas de personalidad para generar insights de talento. No es diagnóstico clínico ni debe usarse como decisión única de selección.
       </p>
       <div className="notice-grid">
-        <div><strong>Tu reporte</strong><span>Recibirás un PDF descargable con tu arquetipo principal, recomendaciones y curva individual de capital.</span></div>
+        <div><strong>Tu reporte</strong><span>Recibirás un PDF descargable con tu perfil de personalidad, recomendaciones y curva individual de capital.</span></div>
         <div><strong>Datos internos</strong><span>La empresa verá resultados agregados y resumen conductual para análisis.</span></div>
         <div><strong>Privacidad</strong><span>El reporte candidato no muestra comparaciones con otros participantes.</span></div>
       </div>
@@ -872,6 +879,8 @@ function calculateCvMatch(candidate: Candidate, position: JobPosition): CvMatchR
 }
 
 function extractKeywords(text: string, limit = 28) {
+  // M3 — slice(0, limit) must come AFTER dedup + stopword filter, not before,
+  // so long JDs are not truncated before meaningful tokens are extracted.
   const stopwords = new Set([
     "para", "con", "por", "una", "uno", "del", "las", "los", "que", "como", "esta", "este", "desde", "sobre",
     "persona", "buscamos", "experiencia", "equipo", "trabajo", "rol", "posición", "posicion", "nivel", "actual",
@@ -879,8 +888,8 @@ function extractKeywords(text: string, limit = 28) {
   return [...new Set(normalize(text)
     .split(/\s+/)
     .map((word) => word.trim())
-    .filter((word) => word.length > 3 && !stopwords.has(word)))]
-    .slice(0, limit);
+    .filter((word) => word.length > 3 && !stopwords.has(word))
+    .slice(0, limit))];
 }
 
 function buildCvRecommendations(matched: string[], missing: string[], position: JobPosition) {
@@ -1164,8 +1173,10 @@ function AdminCandidateDetail({ candidate, positions, pool, onBack }: { candidat
   ] : [];
   function openCv() {
     if (!candidate.cvFile?.dataUrl) return;
-    const win = window.open();
-    if (win) win.document.write(`<iframe src="${candidate.cvFile.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>`);
+    // C1 (iframe) — avoid document.write with a data URL; open the data URL
+    // directly instead. Browsers treat data: URLs as opaque origins so there is
+    // no cross-origin escalation risk, and no arbitrary HTML is injected.
+    window.open(candidate.cvFile.dataUrl, "_blank", "noopener,noreferrer");
   }
   return (
     <section className="workbench">
@@ -1394,7 +1405,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
         </div>
         <div className="actions">
           <div className="admin-search">
-            <input placeholder="🔍 Buscar candidato por nombre…" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input type="search" aria-label="Buscar candidato por nombre" placeholder="🔍 Buscar candidato por nombre…" value={search} onChange={(event) => setSearch(event.target.value)} />
             {searchMatches.length > 0 && (
               <div className="admin-search-results">
                 {searchMatches.map((candidate) => (
@@ -1438,10 +1449,10 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
         <div className="panel wide">
           <h2>Nueva posición</h2>
           <div className="position-form">
-            <input placeholder="Título de posición" value={positionForm.title} onChange={(event) => setPositionForm({ ...positionForm, title: event.target.value })} />
-            <input placeholder="Área" value={positionForm.department} onChange={(event) => setPositionForm({ ...positionForm, department: event.target.value })} />
-            <input placeholder="Ubicación" value={positionForm.location} onChange={(event) => setPositionForm({ ...positionForm, location: event.target.value })} />
-            <textarea placeholder="Job Description / responsabilidades / requisitos / habilidades clave" value={positionForm.jd} onChange={(event) => setPositionForm({ ...positionForm, jd: event.target.value })} />
+            <input aria-label="Título de posición" placeholder="Título de posición" value={positionForm.title} onChange={(event) => setPositionForm({ ...positionForm, title: event.target.value })} />
+            <input aria-label="Área" placeholder="Área" value={positionForm.department} onChange={(event) => setPositionForm({ ...positionForm, department: event.target.value })} />
+            <input aria-label="Ubicación" placeholder="Ubicación" value={positionForm.location} onChange={(event) => setPositionForm({ ...positionForm, location: event.target.value })} />
+            <textarea aria-label="Job Description" placeholder="Job Description / responsabilidades / requisitos / habilidades clave" value={positionForm.jd} onChange={(event) => setPositionForm({ ...positionForm, jd: event.target.value })} />
             <div className="assessment-checklist">
               <span className="checklist-label">Pruebas de esta posición {positionAssessments.length === 0 && <em className="error-inline">elige al menos una</em>}</span>
               <div className="checklist-grid">
@@ -1464,10 +1475,10 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
         <div className="panel">
           <h2>Nuevo candidato</h2>
           <div className="form-grid">
-            <input placeholder="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-            <input placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-            <input placeholder="Teléfono" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-            <select value={form.positionId} onChange={(event) => setForm({ ...form, positionId: event.target.value })}>
+            <input aria-label="Nombre del candidato" placeholder="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <input aria-label="Email del candidato" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+            <input aria-label="Teléfono del candidato" placeholder="Teléfono" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+            <select aria-label="Posición del candidato" value={form.positionId} onChange={(event) => setForm({ ...form, positionId: event.target.value })}>
               {db.positions.filter((position) => position.status === "open").map((position) => <option key={position.id} value={position.id}>{position.title}</option>)}
             </select>
             <button className="button" onClick={addCandidate}>Crear invitación</button>
@@ -1539,7 +1550,20 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
           ) : (
             <ol className="rank-list">
               {ranked.map((row, index) => (
-                <li key={row.candidate.id} className="rank-row" onClick={() => setDetailId(row.candidate.id)}>
+                <li
+                  key={row.candidate.id}
+                  className="rank-row"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Abrir ficha de ${row.candidate.name}`}
+                  onClick={() => setDetailId(row.candidate.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setDetailId(row.candidate.id);
+                    }
+                  }}
+                >
                   <span className={`rank-pos ${index < 3 ? `rank-pos--${index + 1}` : ""}`}>{index + 1}</span>
                   <div className="rank-name">
                     <strong>{row.candidate.name}</strong>
@@ -1630,27 +1654,40 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
           <table>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Teléfono</th>
-                <th>Rol</th>
-                <th>Posición</th>
-                <th>Match CV</th>
-                <th>Código</th>
-                <th>Auth</th>
-                <th>CV</th>
-                <th>Estado</th>
-                <th>Calidad</th>
-                <th>Outcome</th>
-                <th>Personalidad</th>
-                <th>Conductual</th>
-                <th>Accesos</th>
-                <th>Última sesión</th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Email</th>
+                <th scope="col">Teléfono</th>
+                <th scope="col">Rol</th>
+                <th scope="col">Posición</th>
+                <th scope="col">Match CV</th>
+                <th scope="col">Código</th>
+                <th scope="col">Auth</th>
+                <th scope="col">CV</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Calidad</th>
+                <th scope="col">Outcome</th>
+                <th scope="col">Personalidad</th>
+                <th scope="col">Conductual</th>
+                <th scope="col">Accesos</th>
+                <th scope="col">Última sesión</th>
               </tr>
             </thead>
             <tbody>
               {db.candidates.map((item) => (
-                <tr key={item.id} className="candidate-row" onClick={() => setDetailId(item.id)}>
+                <tr
+                  key={item.id}
+                  className="candidate-row"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Abrir ficha de ${item.name}`}
+                  onClick={() => setDetailId(item.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setDetailId(item.id);
+                    }
+                  }}
+                >
                   <td>{item.name}</td>
                   <td>{item.email}</td>
                   <td>{item.phone ?? "-"}</td>
@@ -1688,10 +1725,25 @@ function dominantDomain(domains: Record<BigFiveDomainKey, number>): string {
   return `${top.shortName} ${domains[top.key]}`;
 }
 
+// C1 — escape all user-supplied values before interpolating into HTML strings
+function escHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function pdfBars(rows: Array<[string, number, string?]>) {
-  return rows.map(([label, value, color]) =>
-    `<div class="row"><span>${label}</span><div class="bar"><i style="width:${value}%${color ? `;background:${color}` : ""}"></i></div><strong>${value}</strong></div>`,
-  ).join("");
+  return rows.map(([label, value, color]) => {
+    // label comes from bigFiveDomains (static) or static strings — still escape for safety.
+    // value is always a number; color comes from static domain definitions.
+    const safeLabel = escHtml(label);
+    const safeValue = Number(value); // numeric — no interpolation risk
+    const safeColor = color ? escHtml(color) : "";
+    return `<div class="row"><span>${safeLabel}</span><div class="bar"><i style="width:${safeValue}%${safeColor ? `;background:${safeColor}` : ""}"></i></div><strong>${safeValue}</strong></div>`;
+  }).join("");
 }
 
 function candidateReportHtml(candidate: Candidate) {
@@ -1707,7 +1759,9 @@ function candidateReportHtml(candidate: Candidate) {
     ...(typeof b.workingMemory === "number" ? [["Memoria de trabajo", b.workingMemory] as [string, number]] : []),
     ...(typeof b.fluidReasoning === "number" ? [["Razonamiento fluido", b.fluidReasoning] as [string, number]] : []),
   ] : [];
-  return `<!doctype html><html><head><title>Reporte ${candidate.name}</title><style>
+  // C1 — candidate.name is user-supplied; escape before interpolation
+  const safeName = escHtml(candidate.name);
+  return `<!doctype html><html><head><title>Reporte ${safeName}</title><style>
     body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;color:#17201c;background:#f7f8f4}
     .page{max-width:760px;margin:0 auto;padding:44px}
     h1{font-size:40px;line-height:1;margin:0 0 6px}.tag{color:#2a7a75;font-weight:800;text-transform:uppercase;font-size:12px}
@@ -1717,8 +1771,8 @@ function candidateReportHtml(candidate: Candidate) {
     .note{margin-top:28px;padding:14px;border:1px solid #d8b46a;background:#fff6dd;border-radius:12px;font-size:13px}
     @media print{button{display:none}.page{padding:28px}}
   </style></head><body><main class="page">
-    <p class="tag">Reporte · ${APP_NAME}</p>
-    <h1>${candidate.name}</h1>
+    <p class="tag">Reporte · ${escHtml(APP_NAME)}</p>
+    <h1>${safeName}</h1>
     <p>${new Date().toLocaleDateString("es-PE")}</p>
     ${p ? `<h2>Perfil de personalidad (Big Five)</h2><p style="font-size:13px;color:#5a6b63">Estilo personal — no hay valores buenos o malos.</p>${pdfBars(bfRows)}` : ""}
     ${b ? `<h2>Desempeño conductual</h2>${pdfBars(bhRows)}` : ""}
@@ -1732,15 +1786,57 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function GraphHelp({ title, measures, theory, analysis, sources }: { title: string; measures: string; theory: string; analysis: string; sources: string[] }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const titleId = useMemo(() => `gh-title-${Math.random().toString(36).slice(2, 9)}`, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const card = cardRef.current;
+    if (!card) return;
+    const focusables = () =>
+      Array.from(card.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(
+        (el) => !el.hasAttribute("disabled")
+      );
+    // Mueve el foco al primer elemento accionable del modal al abrir.
+    focusables()[0]?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      // Restaura el foco al disparador al cerrar.
+      triggerRef.current?.focus();
+    };
+  }, [open]);
+
   return (
     <span className="graph-help">
-      <button className="graph-help-btn" onClick={() => setOpen(true)} aria-label={`Sustento teórico de ${title}`} title="Sustento teórico">?</button>
+      <button ref={triggerRef} className="graph-help-btn" onClick={() => setOpen(true)} aria-label={`Sustento teórico de ${title}`} title="Sustento teórico">?</button>
       {open && (
-        <div className="graph-help-overlay" onClick={() => setOpen(false)} role="dialog" aria-modal="true">
-          <div className="graph-help-card" onClick={(event) => event.stopPropagation()}>
+        <div className="graph-help-overlay" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+          <div className="graph-help-card" ref={cardRef} onClick={(event) => event.stopPropagation()}>
             <button className="graph-help-close" onClick={() => setOpen(false)} aria-label="Cerrar">×</button>
             <p className="eyebrow">Sustento teórico</p>
-            <h3>{title}</h3>
+            <h3 id={titleId}>{title}</h3>
             <h4>Qué mide</h4>
             <p>{measures}</p>
             <h4>Fundamento</h4>
@@ -1756,9 +1852,7 @@ function GraphHelp({ title, measures, theory, analysis, sources }: { title: stri
   );
 }
 
-function PanelHead({ title, help }: { title: string; help: ReactNode }) {
-  return <div className="panel-head"><h2>{title}</h2>{help}</div>;
-}
+// B3 — PanelHead removed: defined but never used in JSX.
 
 function QualityChip({ quality }: { quality: DataQuality }) {
   const label = quality.level === "ok" ? "Confiable" : quality.level === "review" ? "Revisar" : "Baja";
@@ -1864,13 +1958,7 @@ function Progress({ value }: { value: number }) {
   return <div className="progress"><span>{value}%</span><div><i style={{ width: `${value}%` }} /></div></div>;
 }
 
-function Info({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="info"><h3>{title}</h3><p>{children}</p></div>;
-}
-
-function ReportBlock({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="panel"><h2>{title}</h2><p>{children}</p></div>;
-}
+// B4 — Info and ReportBlock removed: defined but never used in JSX.
 
 function ListBlock({ title, items }: { title: string; items: string[] }) {
   return <div className="panel"><h2>{title}</h2><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></div>;

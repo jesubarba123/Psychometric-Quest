@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { SignalSurgeMetrics } from "../../psychometrics/types";
+import { AURORA, STRUCTURE } from "../../utils/palette";
 
 const BENCHMARK_BY_PHASE = [
   { hitRate: 0.78 },
@@ -33,9 +34,9 @@ export function DecayCurveChart({ metrics }: Props) {
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: -12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(216,232,228,.08)" vertical={false} />
-          <XAxis dataKey="phase" tick={{ fontSize: 11, fill: "#7a9898" }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="phase" tick={{ fontSize: 11, fill: STRUCTURE.muted }} axisLine={false} tickLine={false} />
           <YAxis
-            tick={{ fontSize: 11, fill: "#7a9898" }}
+            tick={{ fontSize: 11, fill: STRUCTURE.muted }}
             axisLine={false}
             tickLine={false}
             width={42}
@@ -44,18 +45,18 @@ export function DecayCurveChart({ metrics }: Props) {
           />
           <Tooltip
             contentStyle={{
-              background: "#161d24",
-              border: "1px solid #2a3a48",
+              background: STRUCTURE.surface,
+              border: `1px solid ${STRUCTURE.line}`,
               borderRadius: 8,
-              color: "#d8e8e4",
+              color: STRUCTURE.ink,
               fontSize: 12,
             }}
             formatter={(value, name) => [`${value}%`, name]}
           />
-          <Legend wrapperStyle={{ color: "#7a9898", fontSize: 12 }} />
+          <Legend wrapperStyle={{ color: STRUCTURE.muted, fontSize: 12 }} />
           <Line type="monotone" dataKey="benchmark" name="Benchmark hits" stroke="rgba(216,232,228,.38)" strokeDasharray="4 4" dot={false} />
-          <Line type="monotone" dataKey="hitRate" name="Hit rate" stroke="#4ecdc4" strokeWidth={2.5} dot={{ r: 4, fill: "#4ecdc4" }} />
-          <Line type="monotone" dataKey="falseAlarms" name="Falsas alarmas" stroke="#e8a94a" strokeWidth={2} strokeDasharray="3 3" dot={{ r: 3, fill: "#e8a94a" }} />
+          <Line type="monotone" dataKey="hitRate" name="Hit rate" stroke={AURORA.signal} strokeWidth={2.5} dot={{ r: 4, fill: AURORA.signal }} />
+          <Line type="monotone" dataKey="falseAlarms" name="Falsas alarmas" stroke={AURORA.amber} strokeWidth={2} strokeDasharray="3 3" dot={{ r: 3, fill: AURORA.amber }} />
         </LineChart>
       </ResponsiveContainer>
     </div>

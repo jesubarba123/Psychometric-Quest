@@ -65,9 +65,16 @@ function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const decayIndex = parseFloat(Math.max(0, p1Rate - p3Rate).toFixed(2));
 
   // composite score (0–100)
-  const totalTargets = events.filter(e => e.type === "hit" || e.type === "miss").length + hits;
-  const hitRate = totalTargets ? hits / (hits + misses) : 0;
-  const faRate = falseAlarms / Math.max(1, events.filter(e => e.type !== "hit" || true).length);
+  // C4 — `e.type !== "hit" || true` was always true (tautology), so faRate was
+  //      computed against the total event count instead of the distractor count.
+  //      The denominator must be the number of distractor trials only.
+  const hitRate = (hits + misses) > 0 ? hits / (hits + misses) : 0;
+  // Total trials = hits + misses + correct-rejections + false-alarms.
+  // Distractor trials = total - target trials = (events count has no correct-rejections
+  // logged). We use the known distribution: TRIALS_PER_PHASE * (1 - TARGET_RATIO) per phase.
+  const PHASES_PLAYED = Math.max(1, ...events.map(e => e.phase));
+  const distractorTrials = Math.round(TRIALS_PER_PHASE * (1 - TARGET_RATIO)) * PHASES_PLAYED;
+  const faRate = falseAlarms / Math.max(1, distractorTrials);
   const rtScore = Math.max(0, 1 - (meanRt - 200) / 700);
   const attentionScore = Math.round(
     (hitRate * 50 + (1 - Math.min(faRate * 5, 1)) * 25 + rtScore * 25) * (1 - decayIndex * 0.2)
@@ -191,15 +198,42 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
   const trialActive = useRef(false);
   const phaseRef = useRef(1);
   const trialRef = useRef(0);
+  // Sync refs for signalVisible / isTarget so handleResponse never reads a
+  // stale closure value (fixes the "ghost false alarm" race condition).
+  const signalVisibleRef = useRef(false);
+  const isTargetRef = useRef(false);
+  // M1 — collect all timer IDs so they can be cleared on unmount (prevents leak)
+  const timerIds = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Track phase accurately in refs for callbacks
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { trialRef.current = trialInPhase; }, [trialInPhase]);
+  useEffect(() => { signalVisibleRef.current = signalVisible; }, [signalVisible]);
+  useEffect(() => { isTargetRef.current = isTarget; }, [isTarget]);
+
+  // M1 — cleanup: clear all pending timeouts on unmount to prevent state updates
+  //      on an already-unmounted component.
+  useEffect(() => {
+    return () => {
+      timerIds.current.forEach((id) => clearTimeout(id));
+      timerIds.current = [];
+    };
+  }, []);
+
+  // Helper: schedule a timeout and register it for cleanup
+  const scheduleTimeout = useCallback((fn: () => void, delay: number) => {
+    const id = setTimeout(() => {
+      timerIds.current = timerIds.current.filter((t) => t !== id);
+      fn();
+    }, delay);
+    timerIds.current.push(id);
+    return id;
+  }, []);
 
   const showFeedback = useCallback((type: "hit" | "miss" | "false_alarm") => {
     setFeedback(type);
-    setTimeout(() => setFeedback(null), 400);
-  }, []);
+    scheduleTimeout(() => setFeedback(null), 400);
+  }, [scheduleTimeout]);
 
   const endGame = useCallback((finalEvents: SignalEvent[]) => {
     const res = computeResult(finalEvents);
@@ -226,9 +260,9 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
       return;
     }
 
-    // ISI pause
+    // ISI pause — M1: use scheduleTimeout so ID is tracked for cleanup
     const isi = ISI_MIN + Math.random() * (ISI_MAX - ISI_MIN);
-    setTimeout(() => {
+    scheduleTimeout(() => {
       // Pick random cell and whether it's a target
       const cell = Math.floor(Math.random() * TOTAL_CELLS);
       const target = Math.random() < TARGET_RATIO;
@@ -256,8 +290,8 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
       };
       requestAnimationFrame(animFrame);
 
-      // Auto-expire
-      setTimeout(() => {
+      // Auto-expire — M1: use scheduleTimeout so ID is tracked for cleanup
+      scheduleTimeout(() => {
         if (!trialActive.current) return;
         trialActive.current = false;
         setSignalVisible(false);
@@ -280,7 +314,7 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
         }
       }, duration);
     }, isi);
-  }, [endGame, showFeedback]);
+  }, [endGame, showFeedback, scheduleTimeout]);
 
   const startPhase = useCallback(() => {
     setScreen("playing");
@@ -289,9 +323,15 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
   }, [runTrial]);
 
   const handleResponse = useCallback(() => {
+    // Read from refs to avoid stale closure values — prevents ghost false alarms
+    // that can occur when the timer auto-expires (trialActive=false) before the
+    // re-render that sets signalVisible=false has been committed.
+    const visibleNow = signalVisibleRef.current;
+    const targetNow = isTargetRef.current;
+
     if (!trialActive.current) {
-      // False alarm (responded when no signal or distractor)
-      if (signalVisible && !isTarget) {
+      // Only register a false alarm when a distractor was genuinely still visible
+      if (visibleNow && !targetNow) {
         const newEvent: SignalEvent = { type: "false_alarm", phase: phaseRef.current };
         events.current = [...events.current, newEvent];
         showFeedback("false_alarm");
@@ -299,9 +339,9 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
       return;
     }
 
-    if (!signalVisible) return;
+    if (!visibleNow) return;
 
-    if (isTarget) {
+    if (targetNow) {
       // Hit
       const rt = Math.round(performance.now() - signalStart.current);
       const newEvent: SignalEvent = { type: "hit", rt, phase: phaseRef.current };
@@ -314,12 +354,12 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
       setTrialInPhase(nextTrial);
       runTrial(phaseRef.current, nextTrial, events.current);
     } else {
-      // False alarm on distractor
+      // False alarm on distractor (trial still active)
       const newEvent: SignalEvent = { type: "false_alarm", phase: phaseRef.current };
       events.current = [...events.current, newEvent];
       showFeedback("false_alarm");
     }
-  }, [signalVisible, isTarget, runTrial, showFeedback]);
+  }, [runTrial, showFeedback]);
 
   // Keyboard support
   useEffect(() => {

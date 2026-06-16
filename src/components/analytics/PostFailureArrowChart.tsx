@@ -1,4 +1,5 @@
 import type { FrogRiskMetrics } from "../../psychometrics/types";
+import { SEMANTIC } from "../../utils/palette";
 
 type Props = {
   metrics: FrogRiskMetrics;
@@ -38,7 +39,7 @@ export function PostFailureArrowChart({ metrics }: Props) {
         const cx = 50 + index * colW + colW / 2;
         const yBefore = yForRisk(pair.before);
         const yAfter = yForRisk(pair.after);
-        const color = pair.after < pair.before ? "#5cb88a" : pair.after > pair.before ? "#e05c5c" : "#e8a94a";
+        const color = pair.after < pair.before ? SEMANTIC.good : pair.after > pair.before ? SEMANTIC.bad : SEMANTIC.warn;
         return (
           <g key={`${pair.index}-${pair.before}-${pair.after}`} style={{ color }}>
             <circle cx={cx} cy={yBefore} r={5} fill={color} opacity={0.62} />

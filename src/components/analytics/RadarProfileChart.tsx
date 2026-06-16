@@ -7,6 +7,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { CandidateProfile } from "../../psychometrics/types";
+import { AURORA, STRUCTURE } from "../../utils/palette";
 
 const DIMENSION_LABELS: Record<keyof CandidateProfile["radarDimensions"], string> = {
   sustainedAttention: "Atención",
@@ -40,7 +41,7 @@ export function RadarProfileChart({ profile }: Props) {
       <ResponsiveContainer>
         <RadarChart data={data} margin={{ top: 10, right: 36, bottom: 10, left: 36 }}>
           <PolarGrid stroke="rgba(216,232,228,.12)" />
-          <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: "#9db7b5" }} />
+          <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: STRUCTURE.mutedTick }} />
           <Radar
             name="Benchmark"
             dataKey="benchmark"
@@ -51,16 +52,16 @@ export function RadarProfileChart({ profile }: Props) {
           <Radar
             name="Candidato"
             dataKey="candidate"
-            stroke="#4ecdc4"
+            stroke={AURORA.signal}
             fill="rgba(78,205,196,.18)"
             strokeWidth={2}
           />
           <Tooltip
             contentStyle={{
-              background: "#161d24",
-              border: "1px solid #2a3a48",
+              background: STRUCTURE.surface,
+              border: `1px solid ${STRUCTURE.line}`,
               borderRadius: 8,
-              color: "#d8e8e4",
+              color: STRUCTURE.ink,
               fontSize: 12,
             }}
             formatter={(value, name) => [`${value}/100`, name]}

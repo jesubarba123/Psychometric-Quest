@@ -28,25 +28,28 @@ import {
 } from "react";
 import type { Candidate } from "../../types";
 import { computeComposite, isCompositeIdeal, COMPOSITE_IDEAL_MIN, type CompositeProfile } from "../../utils/compositeAxes";
+import { AURORA, AXIS, STRUCTURE } from "../../utils/palette";
 
 // El espacio del gráfico es la reducción a 3 índices compuestos (ver compositeAxes.ts):
 //   X = Cognición · Y = Estrategia · Z = Riesgo calibrado  (cada uno 0-100)
 // Área ideal = los 3 índices ≥ COMPOSITE_IDEAL_MIN.
 
-// ─── Tokens del dashboard (coinciden con :root en styles.css) ────────────────
+// ─── Tokens del dashboard (centralizados en utils/palette.ts) ────────────────
+// Mapa local con los mismos nombres que usaba este motor canvas; cada valor sale
+// de la paleta compartida, así que los colores resueltos son idénticos a antes.
 
 const T = {
-  paper:     "#0e1318",
-  surface:   "#161d24",
-  surface2:  "#1e2830",
-  line:      "#2a3a48",
-  ink:       "#d8e8e4",
-  muted:     "#7a9898",
-  signal:    "#4ecdc4",
-  signalDim: "#2a7a75",
-  axisX:     "#ff9a8d",
-  axisY:     "#8ce8b8",
-  axisZ:     "#9dbdff",
+  paper:     STRUCTURE.paper,
+  surface:   STRUCTURE.surface,
+  surface2:  STRUCTURE.surface2,
+  line:      STRUCTURE.line,
+  ink:       STRUCTURE.ink,
+  muted:     STRUCTURE.muted,
+  signal:    AURORA.signal,
+  signalDim: AURORA.signalDim,
+  axisX:     AXIS.x,
+  axisY:     AXIS.y,
+  axisZ:     AXIS.z,
 } as const;
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────

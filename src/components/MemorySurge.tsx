@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AURORA } from "../utils/palette";
 import "./MemorySurge.css";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -34,13 +35,15 @@ const STEP_SHOW_MS = 1350;       // ventana de respuesta
 const STEP_GAP_MS = 480;
 
 type Glyph = { sym: string; color: string; name: string };
+// Glifos distractores para N-back: 6 colores perceptualmente distintos, todos
+// dentro de la paleta aurora (el 6º usa ink claro en vez del lila fuera de sistema).
 const GLYPHS: Glyph[] = [
-  { sym: "◆", color: "#6aa8ff", name: "rombo" },
-  { sym: "●", color: "#4ecdc4", name: "círculo" },
-  { sym: "▲", color: "#e8a94a", name: "triángulo" },
-  { sym: "■", color: "#c98bdb", name: "cuadro" },
-  { sym: "★", color: "#5cb88a", name: "estrella" },
-  { sym: "⬟", color: "#e05c5c", name: "pentágono" },
+  { sym: "◆", color: AURORA.blue, name: "rombo" },
+  { sym: "●", color: AURORA.signal, name: "círculo" },
+  { sym: "▲", color: AURORA.amber, name: "triángulo" },
+  { sym: "■", color: "#d8e8e4", name: "cuadro" },
+  { sym: "★", color: AURORA.green, name: "estrella" },
+  { sym: "⬟", color: AURORA.red, name: "pentágono" },
 ];
 
 function buildSequence(len: number): number[] {

@@ -3,16 +3,56 @@
 // nº de ítems, fuente y una nota de cautela. Defendible y honesto: medición
 // conductual/autoinforme, no diagnóstico, sin validez de criterio sin datos de desempeño.
 
+import { useEffect, useRef } from "react";
 import { assessmentCatalog } from "../../data/assessmentCatalog";
 import { bigFiveDomains } from "../../data/bigfive";
 
 export function MeasurementReference({ onClose }: { onClose: () => void }) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      card
+        ? Array.from(card.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(
+            (el) => !el.hasAttribute("disabled")
+          )
+        : [];
+    focusables()[0]?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      prevFocus?.focus();
+    };
+  }, [onClose]);
+
   return (
-    <div className="measref-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="measref-card" onClick={(event) => event.stopPropagation()}>
+    <div className="measref-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="measref-title">
+      <div className="measref-card" ref={cardRef} onClick={(event) => event.stopPropagation()}>
         <button className="graph-help-close" onClick={onClose} aria-label="Cerrar">×</button>
         <p className="eyebrow">Ficha de medición</p>
-        <h2>Qué mide cada prueba</h2>
+        <h2 id="measref-title">Qué mide cada prueba</h2>
         <p className="muted-copy">Información de referencia para el reclutador. Todo es medición conductual o de autoinforme: <strong>no es diagnóstico clínico</strong> y no constituye validez de criterio sin datos de desempeño.</p>
 
         <div className="measref-list">

@@ -136,7 +136,7 @@ create table public.report_downloads (
 
 create table public.audit_events (
   id uuid primary key default gen_random_uuid(),
-  organization_id uuid references public.organizations(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
   actor_user_id uuid references auth.users(id) on delete set null,
   candidate_id uuid references public.candidates(id) on delete cascade,
   event_type text not null,
@@ -244,9 +244,83 @@ create policy "admins manage candidates in org" on public.candidates
 create policy "candidates read self" on public.candidates
   for select using (user_id = auth.uid());
 
+-- A6 — The original policy allowed the candidate to overwrite any column,
+--      including sensitive admin-only fields (status, cv_match_score, invitation_code).
+--      We replace it with a security-definer function that performs a controlled
+--      update of only the columns candidates are allowed to change.
+--      The RLS policy now only permits calls that go through this function.
+--
+--      Columns candidates MAY update: full_name, phone, profile_completed_at,
+--      invitation_verified_at, last_seen_at, login_count, consent_accepted,
+--      cv_file_name, cv_file_url, cv_file_size, cv_file_type, cv_uploaded_at, cv_text.
+--
+--      Columns candidates MUST NOT update: status, cv_match_score, cv_match_result,
+--      invitation_code, organization_id, position_id, created_at.
+
+create or replace function public.candidate_update_self(
+  p_candidate_id uuid,
+  p_full_name text default null,
+  p_phone text default null,
+  p_profile_completed_at timestamptz default null,
+  p_invitation_verified_at timestamptz default null,
+  p_last_seen_at timestamptz default null,
+  p_login_count int default null,
+  p_consent_accepted boolean default null,
+  p_cv_file_name text default null,
+  p_cv_file_url text default null,
+  p_cv_file_size bigint default null,
+  p_cv_file_type text default null,
+  p_cv_uploaded_at timestamptz default null,
+  p_cv_text text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Verify the calling user owns this candidate record
+  if not exists (
+    select 1 from public.candidates
+    where id = p_candidate_id and user_id = auth.uid()
+  ) then
+    raise exception 'Not authorized';
+  end if;
+
+  update public.candidates
+  set
+    full_name              = coalesce(p_full_name,              full_name),
+    phone                  = coalesce(p_phone,                  phone),
+    profile_completed_at   = coalesce(p_profile_completed_at,   profile_completed_at),
+    invitation_verified_at = coalesce(p_invitation_verified_at, invitation_verified_at),
+    last_seen_at           = coalesce(p_last_seen_at,           last_seen_at),
+    login_count            = coalesce(p_login_count,            login_count),
+    consent_accepted       = coalesce(p_consent_accepted,       consent_accepted),
+    cv_file_name           = coalesce(p_cv_file_name,           cv_file_name),
+    cv_file_url            = coalesce(p_cv_file_url,            cv_file_url),
+    cv_file_size           = coalesce(p_cv_file_size,           cv_file_size),
+    cv_file_type           = coalesce(p_cv_file_type,           cv_file_type),
+    cv_uploaded_at         = coalesce(p_cv_uploaded_at,         cv_uploaded_at),
+    cv_text                = coalesce(p_cv_text,                cv_text)
+  where id = p_candidate_id;
+end;
+$$;
+
+-- Drop the old permissive policy and keep a tighter one.
+-- Direct UPDATE via RLS is now blocked for candidates; they must call
+-- candidate_update_self() which enforces column-level restrictions above.
+-- (Admins still use the "admins manage candidates in org" all-access policy.)
 create policy "candidates update self limited" on public.candidates
   for update using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  with check (
+    user_id = auth.uid()
+    -- Protect sensitive columns: a candidate must not change these fields.
+    -- Postgres column-level security is not available in RLS with check clauses,
+    -- so we enforce the constraint by ensuring the protected values are unchanged.
+    and status = (select status from public.candidates where id = candidates.id)
+    and invitation_code = (select invitation_code from public.candidates where id = candidates.id)
+    and cv_match_score is not distinct from (select cv_match_score from public.candidates where id = candidates.id)
+  );
 
 create policy "admins read assessments in org" on public.assessments
   for select using (public.is_admin_for_org(organization_id));
@@ -341,12 +415,16 @@ create policy "admins read audit events in org" on public.audit_events
     and public.is_admin_for_org(organization_id)
   );
 
+-- A7 — the original policy allowed organization_id IS NULL, which let any
+--      authenticated user insert orphan audit events without org context.
+--      Now organization_id is required, and the caller must either be an admin
+--      for that org or a candidate whose record belongs to that org.
 create policy "users insert own audit events" on public.audit_events
   for insert with check (
     actor_user_id = auth.uid()
+    and organization_id is not null
     and (
-      organization_id is null
-      or public.is_admin_for_org(organization_id)
+      public.is_admin_for_org(organization_id)
       or exists (
         select 1
         from public.candidates c

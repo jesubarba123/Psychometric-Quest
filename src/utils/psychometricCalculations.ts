@@ -71,7 +71,10 @@ export function calculateFrogMetrics(events: RiskChoiceEvent[]): FrogRiskMetrics
     avgDelta > 0.05 ? "escalates" :
     "maintains";
 
-  const resilience = postFailureDelta.length
+  // B5 — track whether any failure occurred so consumers can suppress the
+  //      lossResilience display (50 is a neutral placeholder when hasFailures=false).
+  const hasFailures = postFailureDelta.length > 0;
+  const resilience = hasFailures
     ? postFailureDelta.filter((delta) => delta <= 0).length / postFailureDelta.length
     : 0.5;
   const lossResilience = Math.round(resilience * 100);
@@ -93,6 +96,7 @@ export function calculateFrogMetrics(events: RiskChoiceEvent[]): FrogRiskMetrics
     meanRisk,
     riskStdDev,
     lossResilience,
+    hasFailures,
     postFailureDelta,
     riskAfterFailure,
     decisionQuality,
