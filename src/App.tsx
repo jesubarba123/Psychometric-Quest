@@ -836,7 +836,7 @@ function GamePlayer({ gameKey, onDone, onBack }: { gameKey: string; onDone: (eve
           : <OpsQueue key="r" onComplete={store.ops_queue} onContinue={finishReal} />)}
         {stage !== "intro" && gameKey === "route_risk" && (stage === "practice"
           ? <FrogRiskRun key="p" round={pRound} score={pScore} history={pHistory} complete={pComplete} choices={routeChoices} totalRounds={2} onAnswer={routePractice} onContinue={() => setStage("real")} />
-          : <FrogRiskRun key="r" round={rRound} score={rScore} history={rHistory} complete={rComplete} choices={routeChoices} onAnswer={routeReal} onContinue={() => rComplete && finishReal()} />)}
+          : <FrogRiskRun key="r" round={rRound} score={rScore} history={rHistory} complete={rComplete} choices={routeChoices} onAnswer={routeReal} onContinue={() => rComplete && onDone(rEvents.current)} />)}
       </div>
     </section>
   );
