@@ -3,9 +3,14 @@ import type { Candidate, JobPosition } from "../types";
 
 const KEY = "signal-run-platform-v3";
 
+// D-2 — versión del esquema persistido. Se sella en cada guardado; al cargar, si
+// la versión no coincide podemos migrar/normalizar en lugar de fallar en silencio.
+const SCHEMA_VERSION = 3;
+
 type Database = {
   candidates: Candidate[];
   positions: JobPosition[];
+  schemaVersion?: number;
 };
 
 const now = () => new Date().toISOString();
@@ -114,31 +119,69 @@ const seed: Database = {
   ],
 };
 
+// N-2 — migración por-forma del esquema persistido. Cada bump de SCHEMA_VERSION debe
+// añadir aquí los pasos que llevan datos antiguos a la forma actual. Es idempotente:
+// normaliza estructuras que versiones previas pudieron no tener. Devuelve un objeto ya
+// sellado en SCHEMA_VERSION.
+function migrate(db: Database): Database {
+  const from = db.schemaVersion ?? 1;
+  const next: Database = { ...db };
+  if (!Array.isArray(next.positions)) next.positions = [...seed.positions];
+  if (!Array.isArray(next.candidates)) next.candidates = [];
+  // Normalización por candidato: campos que esquemas previos pudieron omitir.
+  next.candidates = next.candidates.map((candidate) => ({
+    ...candidate,
+    events: Array.isArray(candidate.events) ? candidate.events : [],
+  }));
+  // Pasos versionados futuros: `if (from < 4) { ...transformaciones v3→v4... }`.
+  // Hoy v1→v3 solo requiere la normalización de arrays/eventos de arriba.
+  if (from < SCHEMA_VERSION) {
+    // (sin transformaciones de forma adicionales en este rango)
+  }
+  next.schemaVersion = SCHEMA_VERSION;
+  return next;
+}
+
 export function loadDatabase(): Database {
   const raw = localStorage.getItem(KEY);
   if (!raw) {
-    localStorage.setItem(KEY, JSON.stringify(seed));
+    saveDatabase(seed);
     return structuredClone(seed);
   }
   try {
     const parsed = JSON.parse(raw) as Database;
-    if (!parsed.positions) parsed.positions = seed.positions;
-    const missingSeed = seed.candidates.filter((candidate) => !parsed.candidates.some((item) => item.id === candidate.id));
-    const missingPositions = seed.positions.filter((position) => !parsed.positions.some((item) => item.id === position.id));
-    if (missingSeed.length || missingPositions.length) {
-      const next = { candidates: [...parsed.candidates, ...missingSeed], positions: [...parsed.positions, ...missingPositions] };
-      saveDatabase(next);
-      return next;
+    const wasOldVersion = parsed.schemaVersion !== SCHEMA_VERSION;
+    const db = migrate(parsed);
+    // Re-inyecta datos semilla que falten (posiciones/candidatos demo).
+    const missingSeed = seed.candidates.filter((candidate) => !db.candidates.some((item) => item.id === candidate.id));
+    const missingPositions = seed.positions.filter((position) => !db.positions.some((item) => item.id === position.id));
+    if (missingSeed.length) db.candidates = [...db.candidates, ...missingSeed];
+    if (missingPositions.length) db.positions = [...db.positions, ...missingPositions];
+    // N-1 — no ignoramos el resultado del guardado. Si migramos de versión o
+    // reinyectamos semilla, persistimos; si el persist falla, seguimos con el
+    // estado en memoria (coherente) y avisamos.
+    if (wasOldVersion || missingSeed.length || missingPositions.length) {
+      if (!saveDatabase(db)) {
+        console.warn("Estado migrado/normalizado disponible en memoria, pero no se pudo persistir.");
+      }
     }
-    return parsed;
+    return db;
   } catch {
-    localStorage.setItem(KEY, JSON.stringify(seed));
+    saveDatabase(seed);
     return structuredClone(seed);
   }
 }
 
-export function saveDatabase(db: Database) {
-  localStorage.setItem(KEY, JSON.stringify(db));
+export function saveDatabase(db: Database): boolean {
+  // D-1 — un setItem puede lanzar (QuotaExceededError, modo privado de Safari,
+  // storage deshabilitado). No debe tumbar la app; reportamos y devolvemos false.
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...db, schemaVersion: SCHEMA_VERSION }));
+    return true;
+  } catch (error) {
+    console.error("No se pudo guardar en localStorage (¿cuota excedida o almacenamiento deshabilitado?):", error);
+    return false;
+  }
 }
 
 export function upsertCandidate(candidate: Candidate) {

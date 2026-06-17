@@ -696,7 +696,13 @@ function Assessments({ candidate, onComplete }: { candidate: Candidate; onComple
     return <Survey candidate={work} onComplete={(next) => back(next)} onBack={() => back()} />;
   }
   if (active) {
-    return <GamePlayer key={active} gameKey={active} onDone={(events) => back({ ...work, events: [...(work.events ?? []), ...events] })} onBack={() => back()} />;
+    // C-1: al re-tomar una prueba, REEMPLAZAR sus eventos (no acumular). Quitamos del
+    // historial los eventos cuyo tipo vuelve a entregar esta prueba, y luego añadimos los nuevos.
+    return <GamePlayer key={active} gameKey={active} onDone={(events) => {
+      const incomingTypes = new Set(events.map((event) => event.type));
+      const kept = (work.events ?? []).filter((event) => !incomingTypes.has(event.type));
+      back({ ...work, events: [...kept, ...events] });
+    }} onBack={() => back()} />;
   }
 
   return (
@@ -817,7 +823,7 @@ function GamePlayer({ gameKey, onDone, onBack }: { gameKey: string; onDone: (eve
         </div>
       )}
       <div className="playfield playfield--single">
-        {stage === "intro" && <AssessmentIntro metaKey={gameKey} onStart={() => setStage(gameKey === "ops_queue" || gameKey === "route_risk" ? "practice" : "practice")} onBack={onBack} />}
+        {stage === "intro" && <AssessmentIntro metaKey={gameKey} onStart={() => setStage("practice")} onBack={onBack} />}
 
         {stage !== "intro" && gameKey === "switchboard" && (stage === "practice"
           ? <Switchboard key="p" practice onComplete={noop} onContinue={() => setStage("real")} />
@@ -942,7 +948,9 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
     if (isLast) {
       const personality = calculateBigFive(answers);
       const surveyEvent = gameEvent("survey_result", { ...personality.domains, inconsistency: personality.inconsistency });
-      onComplete({ ...candidate, personality, surveyAnswers: answers, events: [...(candidate.events ?? []), surveyEvent] });
+      // C-1: re-tomar no debe duplicar el survey_result; reemplazamos el previo si existe.
+      const kept = (candidate.events ?? []).filter((event) => event.type !== "survey_result");
+      onComplete({ ...candidate, personality, surveyAnswers: answers, events: [...kept, surveyEvent] });
     } else {
       setPage((value) => value + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });

@@ -8,3 +8,4 @@ exports/
 .agents/
 skills-lock.json
 .claude/
+.vercel

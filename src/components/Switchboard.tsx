@@ -103,6 +103,9 @@ const Switchboard: React.FC<SwitchboardProps> = ({ practice = false, onComplete,
   const [cardKey, setCardKey] = useState(0);
 
   const eventsRef = useRef<SwitchTrialResult[]>([]);
+  // C-4 — fuente única del índice de ensayo: trialRef refleja el mismo valor que
+  // se renderiza (TRIALS[trial]), de modo que el scoring puntúa la figura mostrada.
+  const trialRef = useRef(0);
   const startRef = useRef(0);
   const lockRef = useRef(false);
   const timersRef = useRef<number[]>([]);
@@ -114,6 +117,7 @@ const Switchboard: React.FC<SwitchboardProps> = ({ practice = false, onComplete,
 
   const beginTrial = useCallback((index: number) => {
     setTrial(index);
+    trialRef.current = index;
     setCardKey(k => k + 1);
     startRef.current = performance.now();
     lockRef.current = false;
@@ -129,7 +133,7 @@ const Switchboard: React.FC<SwitchboardProps> = ({ practice = false, onComplete,
   const answer = useCallback((choice: "left" | "right") => {
     if (screen !== "playing" || lockRef.current) return;
     lockRef.current = true;
-    const idx = eventsRef.current.length;
+    const idx = trialRef.current;   // C-4: misma fuente que el render
     const [sh, co] = TRIALS[idx];
     const correct = correctSide(idx, sh, co, SWITCH_AT);
     const ok = choice === correct;

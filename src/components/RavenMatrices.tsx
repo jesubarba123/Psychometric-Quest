@@ -48,9 +48,14 @@ function genItem(difficulty: number): Item {
   const baseRot = sample(ROTATIONS);
   const rowRot = rotVariesByRow ? shuffle(ROTATIONS) : [baseRot, baseRot, baseRot];
 
+  // C-3 — la celda faltante es siempre (2,2); si count = c+1 la respuesta correcta
+  // tendría SIEMPRE 3 figuras, un atajo que evita el razonamiento. Usamos un offset
+  // cíclico por ítem: la regla "+1 por columna (cíclico)" sigue siendo inferible de
+  // las filas completas, pero la cantidad correcta varía entre 1, 2 y 3.
+  const countOffset = Math.floor(Math.random() * 3);
   const cell = (r: number, c: number): Cell => ({
     shape: shapesByRow[r],
-    count: c + 1,                      // 1,2,3 por columna
+    count: ((c + countOffset) % 3) + 1,   // progresión cíclica por columna
     color: colsColors[c],
     rotation: rowRot[r],
   });

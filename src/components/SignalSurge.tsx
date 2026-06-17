@@ -204,6 +204,8 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
   const isTargetRef = useRef(false);
   // M1 — collect all timer IDs so they can be cleared on unmount (prevents leak)
   const timerIds = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // E-1 — track the progress-bar rAF so we can cancel it on unmount.
+  const progressRaf = useRef<number>(0);
 
   // Track phase accurately in refs for callbacks
   useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -217,6 +219,7 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
     return () => {
       timerIds.current.forEach((id) => clearTimeout(id));
       timerIds.current = [];
+      if (progressRaf.current) cancelAnimationFrame(progressRaf.current);
     };
   }, []);
 
@@ -286,9 +289,10 @@ const SignalSurge: React.FC<SignalSurgeProps> = ({ practice = false, onComplete,
         const elapsed = performance.now() - startTime;
         const remaining = Math.max(0, 1 - elapsed / duration);
         setProgress(remaining);
-        if (remaining > 0) requestAnimationFrame(animFrame);
+        // E-1: detener el rAF cuando termina la fase o el trial deja de estar activo.
+        if (remaining > 0 && trialActive.current) progressRaf.current = requestAnimationFrame(animFrame);
       };
-      requestAnimationFrame(animFrame);
+      progressRaf.current = requestAnimationFrame(animFrame);
 
       // Auto-expire — M1: use scheduleTimeout so ID is tracked for cleanup
       scheduleTimeout(() => {
