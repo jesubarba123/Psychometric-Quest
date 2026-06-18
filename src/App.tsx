@@ -1093,7 +1093,7 @@ function CandidateReport({ candidate }: { candidate: Candidate }) {
               {typeof candidate.behavioral.workingMemory === "number" && <ScoreRow label="Memoria de trabajo" value={candidate.behavioral.workingMemory} />}
               {typeof candidate.behavioral.fluidReasoning === "number" && <ScoreRow label="Razonamiento fluido" value={candidate.behavioral.fluidReasoning} />}
             </div>
-            <p className="profile-note"><strong>{candidate.behavioral.profile}</strong> resume el patrón observado durante los juegos conductuales.</p>
+            <p className="profile-note"><strong>{candidate.behavioral.profile}</strong> resume el patrón observado durante los juegos conductuales. Es una <strong>etiqueta descriptiva</strong>, no un diagnóstico ni un criterio de selección.</p>
           </div>
         )}
         {candidate.cvMatch && (
@@ -1327,6 +1327,18 @@ function AdminCandidateDetail({ candidate, positions, pool, onBack }: { candidat
   );
 }
 
+// Mejora 4 (auditoría psicométrica) — gobernanza de uso: banner visible que
+// declara que la herramienta es de apoyo y aún no tiene validez de criterio.
+function DecisionDisclaimer() {
+  return (
+    <aside className="decision-disclaimer" role="note">
+      <strong>Herramienta de apoyo, no de decisión.</strong> Mide constructos reconocidos y genera hipótesis
+      para la entrevista. Aún <strong>no tiene validez de criterio demostrada</strong>: no la uses como filtro
+      automático ni como base única para contratar, rankear o descartar candidatos.
+    </aside>
+  );
+}
+
 function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
   const db = loadDatabase();
   const [form, setForm] = useState({ name: "", email: "", phone: "", positionId: db.positions[0]?.id ?? "" });
@@ -1431,6 +1443,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
           <button className="button" onClick={() => downloadFile("psychometric-quest-export.json", exportJson(), "application/json")}>Exportar JSON</button>
         </div>
       </div>
+      <DecisionDisclaimer />
       <div className="admin-grid">
         <Metric value={String(db.candidates.length)} label="registrados" />
         <Metric value={String(db.candidates.filter((candidate) => candidate.status === "started").length)} label="iniciados" />

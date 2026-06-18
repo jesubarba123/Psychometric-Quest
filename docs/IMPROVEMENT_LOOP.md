@@ -9,6 +9,18 @@ subagentes: por eso orquesta la sesión principal, no el PM).
 Al terminar, el producto debe tener **UNA mejora notable y verificada** (typecheck + build + E2E en verde)
 y estar **un paso más cerca del despliegue oficial**. Calidad sobre cantidad: una mejora bien hecha por día.
 
+## Prioridad de producto vigente (revisar y evolucionar)
+Hasta nuevo aviso, el PM debe priorizar las mejoras de **"Fase 0"** de la auditoría psicométrica
+(`docs/PSYCHOMETRIC_AUDIT.md`) y la deuda de despliegue, en este orden, antes de mejoras exploratorias:
+1. **Gobernanza de uso** (Mejora 4): disclaimers y degradar fit/arquetipo a descriptivo donde aún falte.
+2. **Estandarizar el scoring** (Mejora 5): reemplazar "pesos mágicos" por z-scores documentados; quitar sobre-precisión.
+3. **Fiabilidad** (Mejora 2): α/ω del Big Five con las respuestas crudas ya persistidas; mostrar SEM/bandas.
+4. **Bancos de ítems fijos y equiparados** (Mejora 3), empezando por Raven (hoy aleatorio por sesión).
+5. **Deuda de despliegue** (QA_AUDIT): CI (ya añadido), tests unitarios de regresión, wiring de Supabase.
+
+El PM puede desviarse si detecta un bug bloqueante o una oportunidad de mayor valor, pero **debe justificarlo**
+y no repetir una mejora ya entregada (revisa commits/PRs recientes).
+
 ## Reglas duras
 - **Nunca** trabajes sobre `main`. Crea una rama y abre un **PR** (no hagas merge).
 - **Nunca** dejes el repo roto: si no logras dejar todo verde, revierte tu cambio y documenta por qué.

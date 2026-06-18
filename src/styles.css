@@ -528,6 +528,8 @@ input::placeholder, textarea::placeholder { color: rgba(122,152,152,.58); }
 .compact-list { margin: 8px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.45; }
 .compact-list li { margin: 7px 0; }
 .disclaimer { margin-top: 18px; padding: 14px; border: 1px solid rgba(232,169,74,.36); border-radius: 10px; color: var(--amber); background: rgba(232,169,74,.08); }
+.decision-disclaimer { margin: 4px 0 20px; padding: 14px 16px; border: 1px solid rgba(232,169,74,.45); border-left: 4px solid var(--amber); border-radius: 10px; background: rgba(232,169,74,.10); color: var(--ink); font-size: 13.5px; line-height: 1.5; }
+.decision-disclaimer strong { color: var(--amber); }
 .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .position-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .position-form textarea { grid-column: 1 / -1; min-height: 130px; }
