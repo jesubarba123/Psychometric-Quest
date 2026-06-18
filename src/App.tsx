@@ -12,7 +12,7 @@ import { CandidateScatter3D } from "./components/analytics/CandidateScatter3D";
 import { PsychometricDashboard } from "./components/analytics/PsychometricDashboard";
 import { MeasurementReference } from "./components/analytics/MeasurementReference";
 import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, loadDatabase, recordCandidateAccess, upsertCandidate } from "./lib/storage";
-import { isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
+import { isAdminEmail, isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
 import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculations";
 import { computeComposite } from "./utils/compositeAxes";
 import { dataQuality, percentileInPool, percentileBand, cvAptitudeGap, positionFit, correlationMatrix, type DataQuality } from "./utils/insights";
@@ -43,13 +43,11 @@ export function App() {
     if (!supabase) return;
 
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        enterCandidate(candidateFromSupabaseUser(data.session.user));
-      }
+      if (data.session?.user) routeAuthedUser(data.session.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) enterCandidate(candidateFromSupabaseUser(session.user));
+      if (session?.user) routeAuthedUser(session.user);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -71,6 +69,14 @@ export function App() {
     setRole("candidate");
     setCandidate(active);
     setScreen(active.status === "completed" ? "candidate-report" : "intro");
+  }
+
+  // Enruta a un usuario autenticado por Supabase según su rol: admin → dashboard,
+  // resto → flujo de candidato. Centraliza la decisión para que la sesión, el
+  // login y los cambios de estado de auth sean consistentes.
+  function routeAuthedUser(user: { email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }) {
+    if (isAdminUser(user)) enterAdmin();
+    else enterCandidate(candidateFromSupabaseUser(user));
   }
 
   function updateCandidate(next: Candidate, nextScreen?: Screen) {
@@ -222,7 +228,10 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
         setError(signInError.message);
         return;
       }
-      if (data.user) onCandidate(candidateFromSupabaseUser(data.user));
+      if (data.user) {
+        if (isAdminUser(data.user)) onAdmin();
+        else onCandidate(candidateFromSupabaseUser(data.user));
+      }
       return;
     }
 
@@ -307,11 +316,16 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
           )}
         </div>
         {error && <p className="error">{error}</p>}
-        {/* C3 — only show demo admin bypass when Supabase is NOT configured */}
-        {!isSupabaseConfigured && (
+        {/* C3 — bypass de admin demo solo SIN Supabase. Con Supabase, el admin
+            inicia sesión con su cuenta autorizada y el rol lo enruta al dashboard. */}
+        {!isSupabaseConfigured ? (
           <div className="admin-login-strip">
             <span>Acceso administrador demo</span>
             <button className="button secondary" onClick={onAdmin}>Entrar como admin</button>
+          </div>
+        ) : (
+          <div className="admin-login-strip">
+            <span>¿Administrador? Inicia sesión con tu cuenta autorizada para abrir el panel.</span>
           </div>
         )}
         </div>
@@ -2011,6 +2025,14 @@ async function digestPassword(email: string, password: string) {
   const payload = new TextEncoder().encode(`${email.trim().toLowerCase()}::${password}`);
   const hash = await crypto.subtle.digest("SHA-256", payload);
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// Un usuario es admin si su rol (app_metadata/user_metadata) es "admin" o su correo
+// está en la lista blanca (VITE_ADMIN_EMAILS). Solo controla el acceso a la UI admin;
+// la seguridad de datos debe reforzarse con RLS en Supabase.
+function isAdminUser(user: { email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }) {
+  const role = String(user.app_metadata?.role ?? user.user_metadata?.role ?? "").toLowerCase();
+  return role === "admin" || isAdminEmail(user.email);
 }
 
 function candidateFromSupabaseUser(user: {
