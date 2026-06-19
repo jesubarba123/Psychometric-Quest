@@ -43,12 +43,13 @@ export function PsychometricDashboard({ profile, frogChoices, audience }: Props)
       <ChartCard title="Perfil psicométrico">
         <RadarProfileChart profile={profile} />
         <div className="analytics-metric-grid five">
-          {Object.entries(profile.radarDimensions).map(([key, value]) => (
+          {(Object.entries(profile.radarDimensions) as [keyof CandidateProfile["radarDimensions"], number | null][]).map(([key, value]) => (
             <MetricCard
               key={key}
-              label={DIMENSION_LABELS[key as keyof CandidateProfile["radarDimensions"]]}
-              value={value}
-              color={scoreColor(value)}
+              label={DIMENSION_LABELS[key]}
+              // CRIT-1: processingSpeed/cognitiveConsistency pueden ser null (sin hits)
+              value={value !== null ? value : "—"}
+              color={value !== null ? scoreColor(value) : undefined}
             />
           ))}
         </div>
@@ -95,8 +96,9 @@ export function PsychometricDashboard({ profile, frogChoices, audience }: Props)
             <ChartCard title="Distribución de RT">
               <RtDistributionChart metrics={signal} />
               <div className="analytics-metric-grid two">
-                <MetricCard label="Mediana RT" value={`${signal.medianRt}ms`} />
-                <MetricCard label="Consistencia" value={signal.cvRt.toFixed(2)} sub={consistencyLabel(signal.consistencyLabel)} color={consistencyColor(signal.consistencyLabel)} />
+                {/* CRIT-1: medianRt y cvRt son null cuando no hubo hits */}
+                <MetricCard label="Mediana RT" value={signal.medianRt !== null ? `${signal.medianRt}ms` : "—"} />
+                <MetricCard label="Consistencia" value={signal.cvRt !== null ? signal.cvRt.toFixed(2) : "—"} sub={consistencyLabel(signal.consistencyLabel)} color={consistencyColor(signal.consistencyLabel)} />
               </div>
             </ChartCard>
 
@@ -182,12 +184,14 @@ function fatigueColor(value: string) {
 function consistencyLabel(value: string) {
   if (value === "consistent") return "consistente";
   if (value === "moderate") return "moderado";
+  if (value === "n/a") return "sin datos";
   return "variable";
 }
 
 function consistencyColor(value: string) {
   if (value === "consistent") return SEMANTIC.good;
   if (value === "moderate") return SEMANTIC.warn;
+  if (value === "n/a") return undefined;
   return SEMANTIC.bad;
 }
 

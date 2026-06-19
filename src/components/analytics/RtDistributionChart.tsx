@@ -22,7 +22,8 @@ export function RtDistributionChart({ metrics }: Props) {
     bucket,
     total: metrics.rtBuckets.filter((item) => item.bucket === bucket).reduce((sum, item) => sum + item.count, 0),
   }));
-  const medianBucket =
+  // CRIT-1: medianRt es null cuando no hubo hits; en ese caso no hay bucket a resaltar
+  const medianBucket: string | null = metrics.medianRt === null ? null :
     metrics.medianRt < 400 ? "200-400" :
     metrics.medianRt < 600 ? "400-600" :
     metrics.medianRt < 800 ? "600-800" :
@@ -47,7 +48,7 @@ export function RtDistributionChart({ metrics }: Props) {
           />
           <Bar dataKey="total" radius={[5, 5, 0, 0]}>
             {data.map((entry) => (
-              <Cell key={entry.bucket} fill={entry.bucket === medianBucket ? AURORA.signal : "rgba(78,205,196,.38)"} />
+              <Cell key={entry.bucket} fill={medianBucket !== null && entry.bucket === medianBucket ? AURORA.signal : "rgba(78,205,196,.38)"} />
             ))}
           </Bar>
         </BarChart>

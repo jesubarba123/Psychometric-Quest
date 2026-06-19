@@ -93,6 +93,11 @@ export function cronbachAlpha(itemMatrix: number[][]): number | null {
   for (let j = 0; j < k; j++) {
     const col = itemMatrix.map((row) => row[j]);
     const v = varianceSample(col);
+    // MED-2 — esta guarda `v === null` es técnicamente inalcanzable en la práctica:
+    // la comprobación `n >= 2` al inicio de cronbachAlpha garantiza que `col` tendrá
+    // al menos 2 elementos y `varianceSample` solo devuelve null con < 2 elementos.
+    // Se conserva para satisfacer el contrato del tipo (TypeScript) y por defensa
+    // ante posibles futuros cambios en la invocación de la función.
     if (v === null) return null;
     sumItemVar += v;
   }

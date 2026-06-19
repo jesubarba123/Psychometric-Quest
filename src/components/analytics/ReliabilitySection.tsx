@@ -15,16 +15,18 @@ interface ReliabilitySectionProps {
 }
 
 /** Badge que indica si el dominio es interpretable o no. */
+// MIN-3 — se elimina aria-label porque duplica el texto visible; el texto ya es
+//         suficientemente descriptivo para los lectores de pantalla.
 function InterpretabilityBadge({ interpretable }: { interpretable: boolean }) {
   if (interpretable) {
     return (
-      <span className="reliability-badge reliability-badge--ok" aria-label="Interpretable">
+      <span className="reliability-badge reliability-badge--ok">
         Interpretable
       </span>
     );
   }
   return (
-    <span className="reliability-badge reliability-badge--low" aria-label="No interpretable">
+    <span className="reliability-badge reliability-badge--low">
       No interpretable
     </span>
   );
@@ -46,7 +48,7 @@ function DomainRow({
     reliability.alpha !== null ? reliability.alpha.toFixed(2) : "—";
 
   return (
-    <div className="reliability-row" key={domainKey}>
+    <div className="reliability-row" key={domainKey} role="listitem">
       <span
         className="reliability-domain-name"
         style={{ color: domainColor }}
@@ -120,8 +122,13 @@ export function ReliabilitySection({ candidates }: ReliabilitySectionProps) {
           Los coeficientes aparecerán cuando haya al menos 2 respondientes por dominio.
         </div>
       ) : (
-        <div className="reliability-table" role="table" aria-label="Fiabilidad por dominio Big Five">
-          <div className="reliability-table-head" role="row" aria-hidden="true">
+        // IMP-1 — el role="table" estaba roto (las filas no tenían role="row").
+        // Se simplifica a role="list" + role="listitem" para que la semántica sea
+        // correcta sin depender de una tabla completa con encabezados de columna.
+        // El header visual se mantiene oculto a AT vía aria-hidden (es decorativo;
+        // cada fila de dominio ya incluye labels descriptivas).
+        <div className="reliability-table" role="list" aria-label="Fiabilidad por dominio Big Five">
+          <div className="reliability-table-head" aria-hidden="true">
             <span>Dominio</span>
             <span>α</span>
             <span>N</span>

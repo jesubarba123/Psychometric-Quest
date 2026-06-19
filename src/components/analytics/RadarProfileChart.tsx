@@ -17,7 +17,7 @@ const DIMENSION_LABELS: Record<keyof CandidateProfile["radarDimensions"], string
   lossResilience: "Resiliencia",
 };
 
-const BENCHMARK: CandidateProfile["radarDimensions"] = {
+const BENCHMARK: Record<keyof CandidateProfile["radarDimensions"], number> = {
   sustainedAttention: 65,
   processingSpeed: 58,
   cognitiveConsistency: 60,
@@ -30,10 +30,12 @@ type Props = {
 };
 
 export function RadarProfileChart({ profile }: Props) {
-  const data = Object.entries(profile.radarDimensions).map(([key, value]) => ({
-    dimension: DIMENSION_LABELS[key as keyof CandidateProfile["radarDimensions"]],
-    candidate: value,
-    benchmark: BENCHMARK[key as keyof CandidateProfile["radarDimensions"]],
+  const data = (Object.entries(profile.radarDimensions) as [keyof CandidateProfile["radarDimensions"], number | null][]).map(([key, value]) => ({
+    dimension: DIMENSION_LABELS[key],
+    // CRIT-1: processingSpeed/cognitiveConsistency pueden ser null (sin hits).
+    // Usamos 0 en el radar para no romper el polígono; el Tooltip mostrará "—".
+    candidate: value ?? 0,
+    benchmark: BENCHMARK[key],
   }));
 
   return (

@@ -948,7 +948,9 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
   function goNext() {
     if (isLast) {
       const personality = calculateBigFive(answers);
-      const surveyEvent = gameEvent("survey_result", { ...personality.domains, inconsistency: personality.inconsistency });
+      // MED-3 — incluir partialDomains en el evento para que quede en el log
+      //         y permita re-derivar el estado de completitud desde los eventos crudos.
+      const surveyEvent = gameEvent("survey_result", { ...personality.domains, inconsistency: personality.inconsistency, partialDomains: personality.partialDomains });
       // C-1: re-tomar no debe duplicar el survey_result; reemplazamos el previo si existe.
       const kept = (candidate.events ?? []).filter((event) => event.type !== "survey_result");
       onComplete({ ...candidate, personality, surveyAnswers: answers, events: [...kept, surveyEvent] });
@@ -1017,22 +1019,32 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
 
 // Reporte de personalidad Big Five (5 dominios), lenguaje no evaluativo
 function BigFiveReport({ result, audience }: { result: import("./types").BigFiveResult; audience: "candidate" | "admin" }) {
+  const hasPartial = result.partialDomains && result.partialDomains.length > 0;
   return (
     <div className="bigfive-report">
       {bigFiveDomains.map((domain) => {
         const value = result.domains[domain.key];
+        // IMP-2 — dominio con ítems sin responder: mostrar superíndice * en el score
+        const isPartial = result.partialDomains?.includes(domain.key) ?? false;
         const tendency = value >= 60 ? domain.highLabel : value <= 40 ? domain.lowLabel : "En un punto intermedio entre ambos extremos.";
         return (
           <div className="bf-domain" key={domain.key}>
             <div className="bf-domain-head">
               <strong>{domain.name}</strong>
-              <span className="bf-domain-score" style={{ color: domain.color }}>{value}</span>
+              <span className="bf-domain-score" style={{ color: domain.color }}>
+                {value}
+                {isPartial && <sup className="bf-partial-marker" aria-label="dominio con ítems sin responder">*</sup>}
+              </span>
             </div>
             <div className="bf-bar"><i style={{ width: `${value}%`, background: domain.color }} /></div>
             <p className="bf-domain-desc">{audience === "candidate" ? `Tiendes a: ${tendency.toLowerCase()}` : tendency}</p>
           </div>
         );
       })}
+      {/* IMP-2 — leyenda del superíndice * solo si hay dominios parciales */}
+      {hasPartial && (
+        <p className="bf-partial-legend">* Dominio con ítems sin responder: interpretar con precaución.</p>
+      )}
       {result.inconsistency > 60 && audience === "admin" && (
         <p className="bf-inconsistency">⚠ Índice de inconsistencia alto ({result.inconsistency}/100): posibles respuestas incoherentes o poco cuidadosas. Interpretar con cautela.</p>
       )}

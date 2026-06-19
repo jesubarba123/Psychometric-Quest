@@ -262,6 +262,14 @@
 .ss-stat-val.ss-warn { color: var(--ss-amber); }
 .ss-stat-val.ss-mid  { color: var(--ss-text-mid); }
 .ss-stat-unit { font-size: 11px; color: var(--ss-text-dim); font-weight: 400; margin-left: 1px; }
+/* IMP-3 — dato no disponible (e.g. TR medio cuando no hubo hits).
+   Usa la misma escala que .ss-stat-val pero con el tono apagado del token dim. */
+.ss-stat-na {
+  font-size: 20px;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  color: var(--ss-text-dim);
+  line-height: 1;
+}
 .ss-stat-lbl {
   font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
   color: var(--ss-text-dim);

@@ -112,17 +112,25 @@ export function calculateFrogMetrics(events: RiskChoiceEvent[]): FrogRiskMetrics
 export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetrics {
   const hitEvents = events.filter((event): event is Extract<SignalEvent, { type: "hit" }> => event.type === "hit");
   const rts = hitEvents.map((event) => event.rt).filter((rt) => Number.isFinite(rt) && rt > 0);
-  const meanRt = Math.round(mean(rts));
-  const medianRt = Math.round(percentile(rts, 50));
-  const rtP25 = Math.round(percentile(rts, 25));
-  const rtP75 = Math.round(percentile(rts, 75));
-  const rtStdDev = Math.round(stdDev(rts));
-  const cvRt = meanRt ? round(rtStdDev / meanRt, 2) : 0;
-  const consistencyLabel =
+
+  // CRIT-1 — cuando no hay hits, todas las métricas de RT son null.
+  // Un rts vacío hacía mean([])→0, rtScore→1.0, processingSpeed→100 (bug inverso al 999).
+  // Principio: excluir el faltante > inventar un valor que deforme el composite.
+  const hasHits = rts.length > 0;
+  const meanRt: number | null = hasHits ? Math.round(mean(rts)) : null;
+  const medianRt: number | null = hasHits ? Math.round(percentile(rts, 50)) : null;
+  const rtP25: number | null = hasHits ? Math.round(percentile(rts, 25)) : null;
+  const rtP75: number | null = hasHits ? Math.round(percentile(rts, 75)) : null;
+  const rtStdDev: number | null = hasHits ? Math.round(stdDev(rts)) : null;
+  const cvRt: number | null = (hasHits && meanRt) ? round(rtStdDev! / meanRt, 2) : null;
+  const consistencyLabel: SignalSurgeMetrics["consistencyLabel"] =
+    cvRt === null ? "n/a" :
     cvRt < 0.2 ? "consistent" :
     cvRt < 0.35 ? "moderate" :
     "variable";
-  const rtOutliers = rts.filter((rt) => rt > meanRt + 2 * rtStdDev);
+  const rtOutliers = (hasHits && meanRt !== null && rtStdDev !== null)
+    ? rts.filter((rt) => rt > meanRt + 2 * rtStdDev)
+    : [];
 
   const metricsByPhase = PHASES.map((phase) => {
     const phaseEvents = events.filter((event) => event.phase === phase);
@@ -136,7 +144,8 @@ export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetric
       phase,
       hitRate: round(ratio(hits, hits + misses), 2),
       faRate: round(ratio(falseAlarms, DISTRACTORS_PER_PHASE), 3),
-      meanRt: Math.round(mean(phaseRts)),
+      // null cuando no hubo hits en esa fase (mismo principio que meanRt global)
+      meanRt: phaseRts.length > 0 ? Math.round(mean(phaseRts)) : null,
     };
   });
 
@@ -159,9 +168,14 @@ export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetric
   const globalMisses = events.filter((event) => event.type === "miss").length;
   const hitRate = ratio(globalHits, globalHits + globalMisses);
   const dPrime = round(zScore(hitRate) - zScore(falseAlarmRate), 2);
-  const rtScore = clamp(1 - (meanRt - 200) / 700, 0, 1);
+  // CRIT-1 — rtScore es null cuando no hay hits; se excluye del composite
+  // en vez de contribuir con 1.0 (el valor máximo que producía el bug).
+  const rtScore = hasHits && meanRt !== null
+    ? clamp(1 - (meanRt - 200) / 700, 0, 1)
+    : null;
+  const rtComponent = rtScore !== null ? rtScore * 25 : 0;
   const sustainedAttention = clamp(Math.round(
-    (hitRate * 50 + (1 - Math.min(falseAlarmRate * 5, 1)) * 25 + rtScore * 25) *
+    (hitRate * 50 + (1 - Math.min(falseAlarmRate * 5, 1)) * 25 + rtComponent) *
     (1 - decayIndex * 0.2),
   ), 0, 100);
 
@@ -193,12 +207,16 @@ export function buildCandidateProfile(
   frogMetrics: FrogRiskMetrics | null,
   signalMetrics: SignalSurgeMetrics | null,
 ): CandidateProfile {
-  const processingSpeed = signalMetrics
+  // CRIT-1 — processingSpeed y cognitiveConsistency son null cuando meanRt/cvRt
+  // son null (sin hits). Propagamos el null en lugar de calcular un valor
+  // artificial (el bug: meanRt=0 producía processingSpeed=100). Los consumidores
+  // de la UI deben manejar null mostrando "—" o simplemente omitiendo la métrica.
+  const processingSpeed: number | null = (signalMetrics && signalMetrics.meanRt !== null)
     ? clamp(Math.round((1 - (signalMetrics.meanRt - 200) / 700) * 100), 0, 100)
-    : 0;
-  const cognitiveConsistency = signalMetrics
+    : null;
+  const cognitiveConsistency: number | null = (signalMetrics && signalMetrics.cvRt !== null)
     ? clamp(Math.round((1 - signalMetrics.cvRt / 0.5) * 100), 0, 100)
-    : 0;
+    : null;
 
   return {
     frog: frogMetrics,
