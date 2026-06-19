@@ -37,7 +37,7 @@ export const assessmentCatalog: AssessmentMeta[] = [
     paradigm: "Matrices Progresivas (tipo Raven) — medida clásica de inteligencia fluida (Gf).",
     highMeans: "Mejor identificación de reglas abstractas y razonamiento con información novel.",
     lowMeans: "Mayor dificultad con patrones abstractos en estas condiciones de tiempo.",
-    items: "6 ítems de dificultad creciente.",
+    items: "12 ítems de dificultad creciente (banco fijo — mismo orden para todos).",
     source: "Raven (1938); marco CHC (Carroll, 1993).",
   },
   {
