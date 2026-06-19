@@ -99,6 +99,82 @@ describe("extractSignalEvents", () => {
   });
 });
 
+// ─── NUEVO-MIN-1: sustainedAttention renormalizado con cero hits ──────────────
+//
+// Sin hits, rtComponent=0 y maxPossible=75. Sin renormalizar, un candidato con
+// hitRate=1 y faRate=0 pero sin RT solo lograría 75 puntos en una escala de 100.
+// Con la renormalización (rawComposite/maxPossible*100) el score refleja
+// correctamente la actuación dentro del subconjunto de métricas disponibles.
+//
+// Con cero hits y cero false alarms:
+//   hitRate=0, faRate=0, rtComponent=0, maxPossible=75, decayIndex=0
+//   rawComposite = 0*50 + (1-min(0*5,1))*25 + 0 = 25
+//   sustainedAttention = round(25/75 * 100 * 1) = round(33.33) = 33
+
+describe("calculateSignalMetrics — sustainedAttention renormalizado (NUEVO-MIN-1)", () => {
+  it("con cero hits no hay penalización oculta por /75: valor esperado 33", () => {
+    const events = makeZeroHitSignalEvents(12); // 12 misses, 0 hits, 0 false alarms
+    const metrics = calculateSignalMetrics(events);
+    // Pre-renormalización: sin escalar, el valor habría sido round(25*(1-0*0.2))=25
+    // (un score de 25/100 sobre escala implícita de 75 — incorrecto).
+    // Post-renormalización: round(25/75*100)=33, reflejando rendimiento nulo
+    // en hitRate pero sin castigar la ausencia de RT.
+    expect(metrics.sustainedAttention).toBe(33);
+  });
+
+  it("con cero hits y decayIndex=0, el factor de decay no lo deforma", () => {
+    const events = makeZeroHitSignalEvents(12);
+    const metrics = calculateSignalMetrics(events);
+    // decayIndex = max(0, hitRateByPhase[0] - hitRateByPhase[2]) = 0 con todos misses
+    expect(metrics.sustainedAttention).toBeLessThanOrEqual(100);
+    expect(metrics.sustainedAttention).toBeGreaterThanOrEqual(0);
+  });
+
+  it("con hits, maxPossible=100 y la renormalización no cambia el valor (escala ya correcta)", () => {
+    // hitRate=1, faRate=0, rtScore=clamp(1-(300-200)/700,0,1)=clamp(0.857,0,1)=0.857
+    // rtComponent=0.857*25=21.43
+    // rawComposite=50+25+21.43=96.43, maxPossible=100
+    // decayIndex con 4 hits por fase → hitRateByPhase=[1,1,1] → decay=0
+    // sustainedAttention=round(96.43/100*100*(1-0))=96
+    const events: SignalEvent[] = [
+      { type: "hit", rt: 300, phase: 1 },
+      { type: "hit", rt: 300, phase: 1 },
+      { type: "hit", rt: 300, phase: 1 },
+      { type: "hit", rt: 300, phase: 1 },
+      { type: "hit", rt: 300, phase: 2 },
+      { type: "hit", rt: 300, phase: 2 },
+      { type: "hit", rt: 300, phase: 2 },
+      { type: "hit", rt: 300, phase: 2 },
+      { type: "hit", rt: 300, phase: 3 },
+      { type: "hit", rt: 300, phase: 3 },
+      { type: "hit", rt: 300, phase: 3 },
+      { type: "hit", rt: 300, phase: 3 },
+    ];
+    const metrics = calculateSignalMetrics(events);
+    expect(metrics.sustainedAttention).toBe(96);
+  });
+});
+
+// ─── NUEVO-MIN-2: cvRt con guard correcto ─────────────────────────────────────
+
+describe("calculateSignalMetrics — cvRt guard (NUEVO-MIN-2)", () => {
+  it("cvRt es null cuando no hay hits (meanRt null)", () => {
+    const events = makeZeroHitSignalEvents();
+    const metrics = calculateSignalMetrics(events);
+    expect(metrics.cvRt).toBeNull();
+  });
+
+  it("cvRt es un número cuando hay al menos dos hits distintos", () => {
+    const events: SignalEvent[] = [
+      { type: "hit", rt: 300, phase: 1 },
+      { type: "hit", rt: 500, phase: 1 },
+    ];
+    const metrics = calculateSignalMetrics(events);
+    expect(metrics.cvRt).not.toBeNull();
+    expect(typeof metrics.cvRt).toBe("number");
+  });
+});
+
 // ─── Caso positivo: con hits, meanRt y processingSpeed tienen valor real ──────
 
 describe("calculateSignalMetrics — con hits", () => {

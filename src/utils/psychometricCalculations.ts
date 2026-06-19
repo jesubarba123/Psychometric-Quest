@@ -122,7 +122,8 @@ export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetric
   const rtP25: number | null = hasHits ? Math.round(percentile(rts, 25)) : null;
   const rtP75: number | null = hasHits ? Math.round(percentile(rts, 75)) : null;
   const rtStdDev: number | null = hasHits ? Math.round(stdDev(rts)) : null;
-  const cvRt: number | null = (hasHits && meanRt) ? round(rtStdDev! / meanRt, 2) : null;
+  // NUEVO-MIN-2: guard explícito — evita división por cero o falsy-number si meanRt fuera 0.
+  const cvRt: number | null = (hasHits && meanRt !== null && meanRt !== 0) ? round(rtStdDev! / meanRt, 2) : null;
   const consistencyLabel: SignalSurgeMetrics["consistencyLabel"] =
     cvRt === null ? "n/a" :
     cvRt < 0.2 ? "consistent" :
@@ -174,9 +175,16 @@ export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetric
     ? clamp(1 - (meanRt - 200) / 700, 0, 1)
     : null;
   const rtComponent = rtScore !== null ? rtScore * 25 : 0;
+  // NUEVO-MIN-1: renormalización cuando no hay RT.
+  // Sin hits, rtComponent=0 y el máximo alcanzable del composite base es 75
+  // (50 de hitRate + 25 de FA). Sin renormalizar, un candidato perfecto sin RT
+  // obtendría ~75 → escala 0-75, no 0-100 → sesgo silencioso.
+  // Solución: dividir por maxPossible antes de multiplicar el factor de decay,
+  // escalando siempre al rango 0-100 sea cual sea el subconjunto de métricas disponible.
+  const maxPossible = 50 + 25 + (rtScore !== null ? 25 : 0); // 100 con RT, 75 sin RT
+  const rawComposite = hitRate * 50 + (1 - Math.min(falseAlarmRate * 5, 1)) * 25 + rtComponent;
   const sustainedAttention = clamp(Math.round(
-    (hitRate * 50 + (1 - Math.min(falseAlarmRate * 5, 1)) * 25 + rtComponent) *
-    (1 - decayIndex * 0.2),
+    (rawComposite / maxPossible * 100) * (1 - decayIndex * 0.2),
   ), 0, 100);
 
   const rtBuckets = buildRtBuckets(events);
