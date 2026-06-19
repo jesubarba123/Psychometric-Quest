@@ -26,13 +26,26 @@ export type MemorySurgeProps = {
 };
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
+// ver docs/SCORING.md §4.3 para justificación de cada parámetro.
 
-const N_BACK = 2;
-const FULL_STEPS = 18;           // 16 puntuables (índices ≥ 2)
+const N_BACK = 2;                // distancia de comparación N-back; 2-back es estándar para MO
+const FULL_STEPS = 18;           // 16 puntuables (índices ≥ N_BACK)
 const PRACTICE_STEPS = 6;
-const MATCH_RATIO = 0.38;        // ~6 coincidencias
-const STEP_SHOW_MS = 1350;       // ventana de respuesta
-const STEP_GAP_MS = 480;
+const MATCH_RATIO = 0.38;        // proporción de ensayos que son coincidencia (~6/16); PROVISIONAL
+const STEP_SHOW_MS = 1350;       // ventana de respuesta en ms; PROVISIONAL — sin calibrar
+const STEP_GAP_MS = 480;         // pausa inter-estímulo en ms; PROVISIONAL — sin calibrar
+
+// ─── Constantes de scoring workingMemoryScore — ver docs/SCORING.md §4.3 ─────
+// Pesos del composite de memoria de trabajo (suma máx ≈ 100):
+//   hitRate  × WM_HIT_WEIGHT  +  (1-faRate) × WM_FA_WEIGHT  +  rtScore × WM_RT_WEIGHT
+// PROVISIONAL — sin calibrar (requiere datos)
+const WM_HIT_WEIGHT = 58;        // peso del hit-rate en el composite de memoria
+const WM_FA_WEIGHT = 30;         // peso del factor de falsas alarmas
+const WM_RT_WEIGHT = 12;         // peso del componente de RT
+// RT de referencia para rtScore = 1 - (meanRt - WM_RT_FLOOR) / WM_RT_RANGE.
+// PROVISIONAL — sin calibrar (requiere datos)
+const WM_RT_FLOOR_MS = 350;      // TR por debajo de este valor se considera perfecto
+const WM_RT_RANGE_MS = 900;      // rango de normalización de RT (ms)
 
 type Glyph = { sym: string; color: string; name: string };
 // Glifos distractores para N-back: 6 colores perceptualmente distintos, todos
@@ -73,10 +86,14 @@ function computeResult(events: MemoryEvent[]): MemorySurgeResult {
   const totalNonTargets = falseAlarms + correctRejections;
   const hitRate = totalTargets ? hits / totalTargets : 0;
   const faRate = totalNonTargets ? falseAlarms / totalNonTargets : 0;
-  const rtScore = meanRt ? Math.max(0, 1 - (meanRt - 350) / 900) : 0.5;
+  // ver docs/SCORING.md §4.3 — WM_RT_FLOOR_MS, WM_RT_RANGE_MS
+  // rtScore=0.5 cuando meanRt=0 (sin hits): valor neutro para no inflar ni castigar.
+  // PROVISIONAL: este 0.5 es un placeholder que debería revisarse con datos reales.
+  const rtScore = meanRt ? Math.max(0, 1 - (meanRt - WM_RT_FLOOR_MS) / WM_RT_RANGE_MS) : 0.5;
 
+  // ver docs/SCORING.md §4.3 — WM_HIT_WEIGHT, WM_FA_WEIGHT, WM_RT_WEIGHT
   const workingMemoryScore = Math.round(
-    Math.max(0, Math.min(100, hitRate * 58 + (1 - faRate) * 30 + rtScore * 12)),
+    Math.max(0, Math.min(100, hitRate * WM_HIT_WEIGHT + (1 - faRate) * WM_FA_WEIGHT + rtScore * WM_RT_WEIGHT)),
   );
   return { hits, misses, falseAlarms, correctRejections, meanRt, workingMemoryScore };
 }

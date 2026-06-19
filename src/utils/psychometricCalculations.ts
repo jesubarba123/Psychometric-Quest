@@ -9,17 +9,58 @@ import type {
   SignalSurgeMetrics,
 } from "../psychometrics/types";
 
+// ─── Constantes de scoring — ver docs/SCORING.md ────────────────────────────
+
+// Parámetros de tarea de riesgo (FrogLeap): recompensas y probabilidades de fallo
+// por tipo de elección. PROVISIONAL — sin calibrar (requiere datos). §4.1
 const RISK_META: Record<RiskChoiceId, { reward: number; risk: number }> = {
-  safe: { reward: 6, risk: 0.08 },
-  probe: { reward: 12, risk: 0.32 },
-  leap: { reward: 22, risk: 0.56 },
+  safe:  { reward: 6,  risk: 0.08 }, // ruta segura: recompensa baja, riesgo bajo
+  probe: { reward: 12, risk: 0.32 }, // ruta moderada
+  leap:  { reward: 22, risk: 0.56 }, // ruta arriesgada: recompensa alta, riesgo alto
 };
 
+// Estructura de la tarea Signal Surge (CPT). §4.2
 const PHASES = [1, 2, 3];
-const SIGNAL_TRIALS_PER_PHASE = 10;
-const TARGET_RATIO = 0.4;
-const TARGETS_PER_PHASE = Math.round(SIGNAL_TRIALS_PER_PHASE * TARGET_RATIO);
-const DISTRACTORS_PER_PHASE = SIGNAL_TRIALS_PER_PHASE - TARGETS_PER_PHASE;
+const SIGNAL_TRIALS_PER_PHASE = 10;    // ensayos por fase (30 total)
+const TARGET_RATIO = 0.4;              // proporción de ensayos que son objetivos (40 %)
+const TARGETS_PER_PHASE = Math.round(SIGNAL_TRIALS_PER_PHASE * TARGET_RATIO);    // 4 objetivos/fase
+const DISTRACTORS_PER_PHASE = SIGNAL_TRIALS_PER_PHASE - TARGETS_PER_PHASE;       // 6 distractores/fase
+
+// ─── Constantes de normalización de RT (Signal Surge) — ver docs/SCORING.md §4.2 ──
+// RT mínimo esperado (ms): TR por debajo de este valor se considera perfecto (rtScore=1).
+// PROVISIONAL — sin calibrar (requiere datos)
+const RT_FLOOR_MS = 200;
+// Rango de RT usado para la normalización lineal: rtScore = 1 - (rt - RT_FLOOR_MS) / RT_RANGE_MS.
+// Un RT de RT_FLOOR_MS + RT_RANGE_MS (=900 ms) produce rtScore = 0.
+// PROVISIONAL — sin calibrar (requiere datos)
+const RT_RANGE_MS = 700;
+
+// ─── Constantes de puntuación de riesgo ajustado (FrogLeap) — ver docs/SCORING.md §4.1 ──
+// Divisor para risk-adjusted score: riskAdjustedScore = finalScore / (1 + meanRisk).
+// La normalización asume que un score sin riesgo (meanRisk≈0) de 80 puntos
+// equivale a un rendimiento perfecto (100). PROVISIONAL — sin calibrar.
+const FROG_DECISION_QUALITY_DIVISOR = 80;
+
+// Umbrales del perfil de decisión (meanRisk). PROVISIONAL — sin calibrar (requiere datos). §4.1
+const FROG_DECISION_CONSERVATIVE_THRESHOLD = 0.2;  // por debajo: perfil "conservative"
+const FROG_DECISION_RECKLESS_THRESHOLD = 0.44;     // por encima: perfil "reckless"
+
+// Umbral de delta post-fallo para clasificar el cambio de riesgo. PROVISIONAL. §4.1
+const FROG_FAILURE_DELTA_THRESHOLD = 0.05;
+
+// ─── Constantes de Signal Surge composite — ver docs/SCORING.md §4.2 ──────────
+// Pesos en el composite de atención sostenida (suma máxima = 100 con RT, 75 sin RT).
+// PROVISIONAL — sin calibrar (requiere datos)
+const SIGNAL_HIT_RATE_WEIGHT = 50;    // peso del hit-rate en el composite
+const SIGNAL_FA_WEIGHT = 25;           // peso del componente de falsas alarmas
+const SIGNAL_RT_WEIGHT = 25;           // peso del componente de RT (excluido si meanRt=null)
+const SIGNAL_FA_SCALE = 5;             // escala de la penalización por FA: min(faRate * FA_SCALE, 1)
+const SIGNAL_DECAY_FACTOR = 0.2;       // fracción del decayIndex que penaliza el composite
+
+// ─── Constantes de cognitiveConsistency — ver docs/SCORING.md §4.2 ────────────
+// Un CV ≥ CV_MAX se mapea a cognitiveConsistency=0; un CV=0 a cognitiveConsistency=100.
+// PROVISIONAL — sin calibrar (requiere datos)
+const CV_MAX = 0.5;
 
 export function extractFrogEvents(events: GameEvent[]): RiskChoiceEvent[] {
   return events
@@ -66,9 +107,10 @@ export function calculateFrogMetrics(events: RiskChoiceEvent[]): FrogRiskMetrics
     });
 
   const avgDelta = mean(postFailureDelta);
+  // ver docs/SCORING.md §4.1 — FROG_FAILURE_DELTA_THRESHOLD
   const riskAfterFailure =
-    avgDelta < -0.05 ? "reduces" :
-    avgDelta > 0.05 ? "escalates" :
+    avgDelta < -FROG_FAILURE_DELTA_THRESHOLD ? "reduces" :
+    avgDelta > FROG_FAILURE_DELTA_THRESHOLD ? "escalates" :
     "maintains";
 
   // B5 — track whether any failure occurred so consumers can suppress the
@@ -82,12 +124,14 @@ export function calculateFrogMetrics(events: RiskChoiceEvent[]): FrogRiskMetrics
   const capitalHistory = [0, ...events.map((event) => event.score)];
   const finalScore = capitalHistory[capitalHistory.length - 1] ?? 0;
   const riskAdjustedScore = round(finalScore / (1 + meanRisk), 1);
-  const decisionQuality = clamp(Math.round((riskAdjustedScore / 80) * 100), 0, 100);
+  // ver docs/SCORING.md §4.1 — FROG_DECISION_QUALITY_DIVISOR
+  const decisionQuality = clamp(Math.round((riskAdjustedScore / FROG_DECISION_QUALITY_DIVISOR) * 100), 0, 100);
   const totalGains = events.filter((event, index) => event.score > (index === 0 ? 0 : events[index - 1].score)).length;
   const totalLosses = events.filter((event, index) => event.score < (index === 0 ? 0 : events[index - 1].score)).length;
+  // ver docs/SCORING.md §4.1 — FROG_DECISION_CONSERVATIVE/RECKLESS_THRESHOLD
   const decisionProfile =
-    meanRisk < 0.2 ? "conservative" :
-    meanRisk > 0.44 ? "reckless" :
+    meanRisk < FROG_DECISION_CONSERVATIVE_THRESHOLD ? "conservative" :
+    meanRisk > FROG_DECISION_RECKLESS_THRESHOLD ? "reckless" :
     "balanced";
 
   return {
@@ -171,20 +215,22 @@ export function calculateSignalMetrics(events: SignalEvent[]): SignalSurgeMetric
   const dPrime = round(zScore(hitRate) - zScore(falseAlarmRate), 2);
   // CRIT-1 — rtScore es null cuando no hay hits; se excluye del composite
   // en vez de contribuir con 1.0 (el valor máximo que producía el bug).
+  // ver docs/SCORING.md §4.2 — RT_FLOOR_MS, RT_RANGE_MS
   const rtScore = hasHits && meanRt !== null
-    ? clamp(1 - (meanRt - 200) / 700, 0, 1)
+    ? clamp(1 - (meanRt - RT_FLOOR_MS) / RT_RANGE_MS, 0, 1)
     : null;
-  const rtComponent = rtScore !== null ? rtScore * 25 : 0;
+  const rtComponent = rtScore !== null ? rtScore * SIGNAL_RT_WEIGHT : 0;
   // NUEVO-MIN-1: renormalización cuando no hay RT.
   // Sin hits, rtComponent=0 y el máximo alcanzable del composite base es 75
   // (50 de hitRate + 25 de FA). Sin renormalizar, un candidato perfecto sin RT
   // obtendría ~75 → escala 0-75, no 0-100 → sesgo silencioso.
   // Solución: dividir por maxPossible antes de multiplicar el factor de decay,
   // escalando siempre al rango 0-100 sea cual sea el subconjunto de métricas disponible.
-  const maxPossible = 50 + 25 + (rtScore !== null ? 25 : 0); // 100 con RT, 75 sin RT
-  const rawComposite = hitRate * 50 + (1 - Math.min(falseAlarmRate * 5, 1)) * 25 + rtComponent;
+  // ver docs/SCORING.md §4.2 — SIGNAL_HIT_RATE_WEIGHT, SIGNAL_FA_WEIGHT, SIGNAL_RT_WEIGHT
+  const maxPossible = SIGNAL_HIT_RATE_WEIGHT + SIGNAL_FA_WEIGHT + (rtScore !== null ? SIGNAL_RT_WEIGHT : 0); // 100 con RT, 75 sin RT
+  const rawComposite = hitRate * SIGNAL_HIT_RATE_WEIGHT + (1 - Math.min(falseAlarmRate * SIGNAL_FA_SCALE, 1)) * SIGNAL_FA_WEIGHT + rtComponent;
   const sustainedAttention = clamp(Math.round(
-    (rawComposite / maxPossible * 100) * (1 - decayIndex * 0.2),
+    (rawComposite / maxPossible * 100) * (1 - decayIndex * SIGNAL_DECAY_FACTOR),
   ), 0, 100);
 
   const rtBuckets = buildRtBuckets(events);
@@ -219,11 +265,12 @@ export function buildCandidateProfile(
   // son null (sin hits). Propagamos el null en lugar de calcular un valor
   // artificial (el bug: meanRt=0 producía processingSpeed=100). Los consumidores
   // de la UI deben manejar null mostrando "—" o simplemente omitiendo la métrica.
+  // ver docs/SCORING.md §4.2 — RT_FLOOR_MS, RT_RANGE_MS, CV_MAX
   const processingSpeed: number | null = (signalMetrics && signalMetrics.meanRt !== null)
-    ? clamp(Math.round((1 - (signalMetrics.meanRt - 200) / 700) * 100), 0, 100)
+    ? clamp(Math.round((1 - (signalMetrics.meanRt - RT_FLOOR_MS) / RT_RANGE_MS) * 100), 0, 100)
     : null;
   const cognitiveConsistency: number | null = (signalMetrics && signalMetrics.cvRt !== null)
-    ? clamp(Math.round((1 - signalMetrics.cvRt / 0.5) * 100), 0, 100)
+    ? clamp(Math.round((1 - signalMetrics.cvRt / CV_MAX) * 100), 0, 100)
     : null;
 
   return {

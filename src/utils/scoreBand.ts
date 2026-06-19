@@ -36,7 +36,15 @@ export type ScoreBandResult = {
   uncertaintyWidth: string;
 };
 
+// SEM proxy de 10 puntos: sustituye al SEM real por dominio mientras no se
+// tenga suficiente N para calcularlo desde la fiabilidad (α de Cronbach).
+// ver docs/SCORING.md §6 — PROVISIONAL (requiere datos).
 const SEM_PROXY = 10;
+
+// Cortes de categoría. ver docs/SCORING.md §6
+// PROVISIONAL — sin calibrar (requiere datos con percentiles normativos reales).
+const CATEGORY_HIGH_THRESHOLD = 60; // value >= umbral → "Alto"
+const CATEGORY_LOW_THRESHOLD = 40;  // value <= umbral → "Bajo"
 
 /**
  * Calcula la banda de incertidumbre y la categoría verbal para un puntaje 0–100.
@@ -49,11 +57,12 @@ export function scoreBand(value: number, sem: number = SEM_PROXY): ScoreBandResu
   const low = Math.max(0, Math.round(value - sem));
   const high = Math.min(100, Math.round(value + sem));
 
+  // ver docs/SCORING.md §6 — CATEGORY_HIGH_THRESHOLD, CATEGORY_LOW_THRESHOLD
   const category: "Alto" | "Medio" | "Bajo" =
-    value >= 60 ? "Alto" : value <= 40 ? "Bajo" : "Medio";
+    value >= CATEGORY_HIGH_THRESHOLD ? "Alto" : value <= CATEGORY_LOW_THRESHOLD ? "Bajo" : "Medio";
 
   const categoryModifier: "high" | "mid" | "low" =
-    value >= 60 ? "high" : value <= 40 ? "low" : "mid";
+    value >= CATEGORY_HIGH_THRESHOLD ? "high" : value <= CATEGORY_LOW_THRESHOLD ? "low" : "mid";
 
   const rangeText = `${low}–${high}`; // U+2013 en dash
 

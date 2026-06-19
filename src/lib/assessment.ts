@@ -1,6 +1,45 @@
 import { bigFiveQuestions, bigFiveDomains, type BigFiveDomainKey } from "../data/bigfive";
 import type { BigFiveResult, BehavioralScores, GameEvent } from "../types";
 
+// ─── Constantes de scoring conductual — ver docs/SCORING.md ──────────────────
+//
+// Adaptabilidad (0–100 normalizado)
+// PROVISIONAL — sin calibrar (requiere datos): pesos derivados de criterio experto inicial.
+const ADAPTABILITY_W_SECOND_ACCURACY = 72; // peso de precisión en segunda mitad (regla compleja)
+const ADAPTABILITY_W_SWITCH_ACCURACY = 18; // peso de precisión global de cambio de regla
+const ADAPTABILITY_W_RECOVERY = 10;        // peso de recuperación tras pérdida
+const ADAPTABILITY_CLAMP_MIN = 18;         // suelo del rango de salida
+const ADAPTABILITY_CLAMP_MAX = 96;         // techo del rango de salida
+
+// Priorización (0–100 normalizado)
+// PROVISIONAL — sin calibrar (requiere datos)
+const PRIORITIZATION_W_OPS_OPTIMAL = 74;  // peso de elecciones de alta prioridad
+const PRIORITIZATION_W_IMPACT_BIAS = 5;   // peso del sesgo hacia ítems de impacto
+const PRIORITIZATION_W_IMPACT_OVER_URGENCY = 7; // premio por impacto > urgencia
+const PRIORITIZATION_CLAMP_MIN = 20;
+const PRIORITIZATION_CLAMP_MAX = 97;
+
+// Control ejecutivo (0–100 normalizado)
+// PROVISIONAL — sin calibrar (requiere datos)
+const EXEC_W_SWITCH_ACCURACY = 55;        // peso dominante: precisión de cambio de regla
+const EXEC_RT_CEILING_MS = 1200;          // techo de RT usado en la penalización de velocidad
+const EXEC_RT_DIVISOR = 18;              // divisor para normalizar la ganancia de velocidad (~66 pts máx)
+const EXEC_W_OPS_OPTIMAL = 15;           // peso de calidad de decisión operacional
+const EXEC_CLAMP_MIN = 18;
+const EXEC_CLAMP_MAX = 95;
+
+// Riesgo calculado (0–100 normalizado)
+// PROVISIONAL — sin calibrar (requiere datos)
+const RISK_BASE = 42;                    // valor de anclaje (no-risk baseline)
+const RISK_W_RISK_LEVEL = 62;            // peso del nivel de riesgo promedio en rutas
+const RISK_W_RECOVERY = 18;             // peso de recuperación tras pérdida
+const RISK_CLAMP_MIN = 18;
+const RISK_CLAMP_MAX = 96;
+
+// Umbral de perfil equilibrado — ver docs/SCORING.md §5
+// PROVISIONAL — sin calibrar: umbral por debajo del cual ningún eje domina
+const BALANCED_SPREAD_THRESHOLD = 7;
+
 export function gameEvent(type: string, payload: Record<string, unknown>): GameEvent {
   return {
     id: crypto.randomUUID(),
@@ -35,15 +74,41 @@ export function calculateBehavioral(events: GameEvent[]): BehavioralScores {
   // del promedio en lugar de usar el placeholder 0.65. Cada componente solo aporta
   // cuando hay datos reales; los pesos se redistribuyen de forma implícita al omitir
   // el término. Decisión: excluir > inventar (opción psicométricamente honesta C3).
+  // ver docs/SCORING.md §2
   const adaptability = clamp(
-    Math.round(secondAccuracy * 72 + switchAccuracy * 18 + (recovery !== null ? recovery * 10 : 0)),
-    18, 96
+    Math.round(
+      secondAccuracy * ADAPTABILITY_W_SECOND_ACCURACY +
+      switchAccuracy * ADAPTABILITY_W_SWITCH_ACCURACY +
+      (recovery !== null ? recovery * ADAPTABILITY_W_RECOVERY : 0)
+    ),
+    ADAPTABILITY_CLAMP_MIN, ADAPTABILITY_CLAMP_MAX
   );
-  const prioritization = clamp(Math.round(opsOptimal * 74 + impactBias * 5 + Math.max(0, impactBias - urgencyBias) * 7), 20, 97);
-  const executiveControl = clamp(Math.round(switchAccuracy * 55 + Math.max(0, 1200 - avgRt) / 18 + opsOptimal * 15), 18, 95);
+  // ver docs/SCORING.md §2
+  const prioritization = clamp(
+    Math.round(
+      opsOptimal * PRIORITIZATION_W_OPS_OPTIMAL +
+      impactBias * PRIORITIZATION_W_IMPACT_BIAS +
+      Math.max(0, impactBias - urgencyBias) * PRIORITIZATION_W_IMPACT_OVER_URGENCY
+    ),
+    PRIORITIZATION_CLAMP_MIN, PRIORITIZATION_CLAMP_MAX
+  );
+  // ver docs/SCORING.md §2
+  const executiveControl = clamp(
+    Math.round(
+      switchAccuracy * EXEC_W_SWITCH_ACCURACY +
+      Math.max(0, EXEC_RT_CEILING_MS - avgRt) / EXEC_RT_DIVISOR +
+      opsOptimal * EXEC_W_OPS_OPTIMAL
+    ),
+    EXEC_CLAMP_MIN, EXEC_CLAMP_MAX
+  );
+  // ver docs/SCORING.md §2
   const calculatedRisk = clamp(
-    Math.round(42 + riskLevel * 62 + (recovery !== null ? recovery * 18 : 0)),
-    18, 96
+    Math.round(
+      RISK_BASE +
+      riskLevel * RISK_W_RISK_LEVEL +
+      (recovery !== null ? recovery * RISK_W_RECOVERY : 0)
+    ),
+    RISK_CLAMP_MIN, RISK_CLAMP_MAX
   );
 
   return {
@@ -136,10 +201,6 @@ const BEHAVIORAL_ARCHETYPES: { name: string; signature: [number, number, number,
   { name: "Estratega adaptativo", signature: [1, 1, 0, 0] },   // adaptabilidad + priorización
   { name: "Ejecutor resiliente", signature: [1, 0, 1, 0] },    // adaptabilidad + control ejecutivo
 ];
-
-// Por debajo de esta dispersión (desviación estándar de los 4 ejes, en puntos
-// 0–100) consideramos el perfil "plano": ningún eje domina con claridad.
-const BALANCED_SPREAD_THRESHOLD = 7;
 
 function chooseProfile(scores: Omit<BehavioralScores, "profile">) {
   const axes = [scores.adaptability, scores.prioritization, scores.executiveControl, scores.calculatedRisk];

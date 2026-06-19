@@ -27,17 +27,34 @@ export type SignalSurgeProps = {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// ver docs/SCORING.md §4.2 para justificación de cada parámetro.
 
 const FULL_PHASES = 3;
 const PRACTICE_PHASES = 1;
 const TRIALS_PER_PHASE = 10;          // 30 total trials
 const TARGET_RATIO = 0.4;             // 40 % of trials are targets
-const SIGNAL_DURATION_MS = [900, 700, 550]; // gets harder per phase
-const ISI_MIN = 800;                  // inter-stimulus interval min
-const ISI_MAX = 2000;
+const SIGNAL_DURATION_MS = [900, 700, 550]; // ventana de señal por fase (ms); PROVISIONAL
+const ISI_MIN = 800;                  // inter-stimulus interval min (ms)
+const ISI_MAX = 2000;                 // inter-stimulus interval max (ms)
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
 const TOTAL_CELLS = GRID_COLS * GRID_ROWS;
+
+// ─── Constantes de scoring attentionScore — ver docs/SCORING.md §4.2 ──────────
+// Pesos del composite de atención sostenida en SignalSurge.tsx.
+// Nota: psychometricCalculations.ts usa constantes paralelas para el mismo
+// cálculo sobre los eventos crudos. Los valores deben mantenerse sincronizados.
+// PROVISIONAL — sin calibrar (requiere datos)
+const SS_HIT_RATE_WEIGHT = 50;  // peso del hit-rate en el composite de atención
+const SS_FA_WEIGHT = 25;        // peso del componente de falsas alarmas
+const SS_RT_WEIGHT = 25;        // peso del componente de RT (omitido si meanRt=undefined)
+const SS_FA_SCALE = 5;          // escala de penalización de FA: min(faRate * SS_FA_SCALE, 1)
+const SS_DECAY_FACTOR = 0.2;    // fracción de decayIndex que penaliza el composite
+// RT de referencia para rtScore = max(0, 1 - (meanRt - SS_RT_FLOOR_MS) / SS_RT_RANGE_MS).
+// Sincronizado con RT_FLOOR_MS / RT_RANGE_MS de psychometricCalculations.ts.
+// PROVISIONAL — sin calibrar (requiere datos)
+const SS_RT_FLOOR_MS = 200;     // TR por debajo de este valor produce rtScore=1
+const SS_RT_RANGE_MS = 700;     // rango de normalización de RT (ms)
 
 // Symbols: targets are the filled triangle (▲), distractors are the rest
 const TARGET_SYMBOL = "▲";
@@ -85,11 +102,12 @@ export function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const faRate = falseAlarms / Math.max(1, distractorTrials);
   // C3 — rtScore solo se calcula cuando hay un meanRt real; sin hits no aporta al composite.
   // Decisión: excluir el componente RT del composite cuando no hay datos de RT,
-  // redistribuyendo su peso (25 pts) entre hitRate (50) y faRate (25) implícitamente.
-  const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - 200) / 700) : null;
-  const rtComponent = rtScore !== null ? rtScore * 25 : 0;
+  // redistribuyendo su peso implícitamente. ver docs/SCORING.md §4.2 — SS_RT_FLOOR_MS, SS_RT_RANGE_MS
+  const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - SS_RT_FLOOR_MS) / SS_RT_RANGE_MS) : null;
+  const rtComponent = rtScore !== null ? rtScore * SS_RT_WEIGHT : 0;
+  // ver docs/SCORING.md §4.2 — SS_HIT_RATE_WEIGHT, SS_FA_WEIGHT, SS_FA_SCALE, SS_DECAY_FACTOR
   const attentionScore = Math.round(
-    (hitRate * 50 + (1 - Math.min(faRate * 5, 1)) * 25 + rtComponent) * (1 - decayIndex * 0.2)
+    (hitRate * SS_HIT_RATE_WEIGHT + (1 - Math.min(faRate * SS_FA_SCALE, 1)) * SS_FA_WEIGHT + rtComponent) * (1 - decayIndex * SS_DECAY_FACTOR)
   );
 
   return { hits, misses, falseAlarms, meanRt, rtVariability, decayIndex, attentionScore };

@@ -14,6 +14,9 @@
 import type { Candidate } from "../types";
 import { buildCandidateProfileFromEvents } from "./psychometricCalculations";
 
+// Umbral "zona ideal": los tres índices compuestos deben superar este valor
+// para que el perfil se considere óptimo en las tres dimensiones.
+// PROVISIONAL — sin calibrar (requiere datos): ver docs/SCORING.md §3
 export const COMPOSITE_IDEAL_MIN = 65;
 
 export interface CompositeProfile {
@@ -29,9 +32,14 @@ function meanDefined(values: Array<number | undefined | null>): number {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
 }
 
-// Banda óptima de riesgo: 40-75 (igual que el criterio de negocio previo).
-// 100 dentro de la banda, decae linealmente fuera de ella.
-const RISK_BAND = { lo: 40, hi: 75, slope: 2.4 };
+// Banda óptima de riesgo: fuera de [lo, hi] la puntuación de riesgo calibrado
+// decae linealmente a razón de `slope` puntos por punto de distancia.
+// PROVISIONAL — sin calibrar (requiere datos): ver docs/SCORING.md §3
+const RISK_BAND = {
+  lo: 40,    // límite inferior de la zona de riesgo saludable
+  hi: 75,    // límite superior de la zona de riesgo saludable
+  slope: 2.4 // penalización por punto fuera de la banda (1/slope ≈ 0.42 pts/pt)
+};
 function riskCalibration(risk: number): number {
   if (risk >= RISK_BAND.lo && risk <= RISK_BAND.hi) return 100;
   const dist = risk < RISK_BAND.lo ? RISK_BAND.lo - risk : risk - RISK_BAND.hi;
