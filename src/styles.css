@@ -1399,6 +1399,13 @@ code { font-family: var(--font-display); letter-spacing: 0.04em; }
 .score-band__category--mid  { color: var(--muted);  }
 .score-band__category--low  { color: var(--amber);  }
 
+/* Etiqueta de nombre del constructo — trunca con elipsis si el contenedor es estrecho */
+.score-band__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Modificador: dominio parcial */
 .score-band--partial {
   padding-left: 8px;

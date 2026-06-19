@@ -271,8 +271,8 @@ y renormalizar, como se hizo en Signal Surge.
 | Constante | Valor | Qué hace | Justificación |
 |---|---|---|---|
 | `SEM_PROXY` | 10 | Error estándar de medición proxy (puntos) | PROVISIONAL — sustituye al SEM real por dominio hasta que haya suficiente N para calcularlo desde la fiabilidad (α de Cronbach vía `SEM = SD × √(1 − α)`). Ver §6.1. |
-| `CATEGORY_HIGH_THRESHOLD` | 60 | Umbral para categoría "Alto": value ≥ 60 | PROVISIONAL — sin percentiles normativos reales. Elegido para que el tercio superior de una escala 0-100 uniforme quede como "Alto". |
-| `CATEGORY_LOW_THRESHOLD` | 40 | Umbral para categoría "Bajo": value ≤ 40 | PROVISIONAL — simétrico al anterior. |
+| `CATEGORY_HIGH_THRESHOLD` | 60 | Umbral para categoría "Alto": value ≥ 60 | PROVISIONAL — sin percentiles normativos reales. La escala conductual efectiva tiene suelo práctico en 18–20 (clamps de `calculateBehavioral`), por lo que el corte ≥ 60 corresponde aproximadamente al cuartil 55 de la distribución conductual esperada, no al tercio superior de una escala 0-100 uniforme. La justificación correcta requiere percentiles normativos de un pool real (N ≥ 50) para calibrar el corte contra el percentil deseado (ej. P67). Sin calibrar. |
+| `CATEGORY_LOW_THRESHOLD` | 40 | Umbral para categoría "Bajo": value ≤ 40 | PROVISIONAL — simétrico al anterior. Con el suelo efectivo en 18–20, el corte ≤ 40 queda por encima del cuartil 25 de la distribución conductual. Requiere calibración con datos reales. |
 
 ### §6.1 SEM real derivado de fiabilidad (próximo paso)
 

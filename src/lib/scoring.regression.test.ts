@@ -15,7 +15,8 @@
 import { describe, it, expect } from "vitest";
 import { calculateBehavioral } from "./assessment";
 import { computeComposite } from "../utils/compositeAxes";
-import { buildCandidateProfileFromEvents } from "../utils/psychometricCalculations";
+import { buildCandidateProfileFromEvents, extractSignalEvents } from "../utils/psychometricCalculations";
+import { computeResult as ssComputeResult } from "../components/SignalSurge";
 import type { GameEvent, Candidate } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,13 +239,71 @@ describe("REGRESIÓN buildCandidateProfileFromEvents (baseline C5)", () => {
     expect(result!.profile.signal?.meanRt).toBe(350);
   });
 
-  it("con solo signal events: sustainedAttention tiene valor coherente 0-100", () => {
+  it("con solo signal events: sustainedAttention = 56 (CRIT-2: valor exacto fijado)", () => {
+    // Derivación del valor esperado (implementación correcta tras CRIT-1):
+    //   Fixture: 2 hits (rt=300, rt=400) fase 1; 1 miss fase 2; 1 miss fase 3.
+    //
+    //   hits=2, misses=2, falseAlarms=0
+    //   rts=[300,400] → meanRt=350
+    //   hitRate   = 2/(2+2) = 0.5
+    //   falseAlarmRate = 0 / (6 distractores × 3 fases) = 0
+    //   rtScore   = clamp(1 − (350−200)/700, 0, 1) = clamp(0.7857, 0, 1) = 0.7857
+    //   rtComponent = 0.7857 × 25 = 19.643
+    //
+    //   hitRateByPhase: [1.0, 0.0, 0.0]  (fase 1: 2/(2+0); fases 2-3: 0/(0+1))
+    //   decayIndex = max(0, 1.0 − 0.0) = 1.0
+    //
+    //   rawComposite = 0.5×50 + (1−0)×25 + 19.643 = 69.643
+    //   maxPossible  = 50 + 25 + 25 = 100  (hay RT)
+    //   sustainedAttention = clamp(round(69.643/100 × 100 × (1 − 1.0×0.2)), 0, 100)
+    //                      = clamp(round(69.643 × 0.8), 0, 100)
+    //                      = clamp(round(55.714), 0, 100)
+    //                      = 56
     const result = buildCandidateProfileFromEvents(SIGNAL_GAME_EVENTS);
     expect(result).not.toBeNull();
     const sa = result!.profile.signal?.sustainedAttention;
-    expect(typeof sa).toBe("number");
-    expect(sa!).toBeGreaterThanOrEqual(0);
-    expect(sa!).toBeLessThanOrEqual(100);
+    expect(sa).toBe(56);
+  });
+
+  it("CRIT-1: sin hits, SignalSurge.computeResult.attentionScore === buildCandidateProfileFromEvents.sustainedAttention", () => {
+    // Previene futura divergencia entre el score que ve el candidato al terminar el juego
+    // y el que ve el admin en el dashboard para la MISMA sesión.
+    //
+    // Fixture SIN hits: 3 misses por fase, 0 false_alarms.
+    // Derivación del valor esperado (ambos pipelines):
+    //   hits=0, misses=9, falseAlarms=0 → meanRt=undefined/null (sin datos RT)
+    //   hitRate = 0/(0+9) = 0
+    //   faRate  = 0 / (6 distractores × 3 fases) = 0
+    //   rtScore = null → rtComponent = 0
+    //   decayIndex = max(0, hitRatePhase1 − hitRatePhase3) = max(0, 0−0) = 0
+    //   maxPossible = 50 + 25 = 75  (sin RT)
+    //   rawComposite = 0×50 + (1−0)×25 + 0 = 25
+    //   attentionScore = clamp(round(25/75 × 100 × (1−0×0.2)), 0, 100)
+    //                  = clamp(round(33.33), 0, 100) = 33
+    const noHitsSignalEvents: GameEvent[] = [
+      makeEvent("signal_surge_event", { type: "miss", phase: 1 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 1 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 1 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 2 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 2 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 2 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 3 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 3 }),
+      makeEvent("signal_surge_event", { type: "miss", phase: 3 }),
+    ];
+
+    // Pipeline del juego (lo que ve el candidato al finalizar)
+    const rawSignalEvents = extractSignalEvents(noHitsSignalEvents);
+    const gameResult = ssComputeResult(rawSignalEvents);
+
+    // Pipeline del dashboard (lo que ve el admin)
+    const profileResult = buildCandidateProfileFromEvents(noHitsSignalEvents);
+    const dashboardSa = profileResult!.profile.signal?.sustainedAttention;
+
+    expect(gameResult.attentionScore).toBe(33);
+    expect(dashboardSa).toBe(33);
+    // La prueba clave: ambos deben ser idénticos
+    expect(gameResult.attentionScore).toBe(dashboardSa);
   });
 
   it("con solo frog events: calculatedRisk es un número 0-100", () => {

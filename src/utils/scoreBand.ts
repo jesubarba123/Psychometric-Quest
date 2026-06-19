@@ -66,11 +66,12 @@ export function scoreBand(value: number, sem: number = SEM_PROXY): ScoreBandResu
 
   const rangeText = `${low}–${high}`; // U+2013 en dash
 
-  // Posición y ancho de la zona de incertidumbre en el track
-  const leftRaw = Math.max(0, value - sem);
-  const rightRaw = Math.min(100, value + sem);
-  const uncertaintyLeft = `${leftRaw}%`;
-  const uncertaintyWidth = `${rightRaw - leftRaw}%`;
+  // IMP-1 — posición y ancho de la zona de incertidumbre derivados de los valores YA
+  // redondeados (low / high), de modo que el texto "rangeText" y la banda visual
+  // siempre muestren exactamente el mismo rango. Antes usaban value±sem sin redondear,
+  // lo que producía ligeras discrepancias (ej. "54%–74%" vs texto "54–74").
+  const uncertaintyLeft = `${low}%`;
+  const uncertaintyWidth = `${high - low}%`;
 
   return { low, high, category, categoryModifier, rangeText, uncertaintyLeft, uncertaintyWidth };
 }

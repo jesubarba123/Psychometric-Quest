@@ -105,10 +105,18 @@ export function computeResult(events: SignalEvent[]): SignalSurgeResult {
   // redistribuyendo su peso implícitamente. ver docs/SCORING.md §4.2 — SS_RT_FLOOR_MS, SS_RT_RANGE_MS
   const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - SS_RT_FLOOR_MS) / SS_RT_RANGE_MS) : null;
   const rtComponent = rtScore !== null ? rtScore * SS_RT_WEIGHT : 0;
-  // ver docs/SCORING.md §4.2 — SS_HIT_RATE_WEIGHT, SS_FA_WEIGHT, SS_FA_SCALE, SS_DECAY_FACTOR
-  const attentionScore = Math.round(
-    (hitRate * SS_HIT_RATE_WEIGHT + (1 - Math.min(faRate * SS_FA_SCALE, 1)) * SS_FA_WEIGHT + rtComponent) * (1 - decayIndex * SS_DECAY_FACTOR)
-  );
+  // CRIT-1 — renormalización por maxPossible, igual que calculateSignalMetrics en psychometricCalculations.ts.
+  // Sin hits, rtComponent=0 y el máximo alcanzable del composite base es 75 (50+25).
+  // Sin renormalizar, un candidato con 0 hits pero sin falsas alarmas obtendría 25 sobre 75 → ~33
+  // al mostrar en pantalla, pero el admin veía el valor ya renormalizado (33) desde el pipeline.
+  // La división por maxPossible escala siempre al rango 0-100 sea cual sea el subconjunto disponible.
+  // ver docs/SCORING.md §4.2 — SS_HIT_RATE_WEIGHT, SS_FA_WEIGHT, SS_RT_WEIGHT, SS_FA_SCALE, SS_DECAY_FACTOR
+  const maxPossible = SS_HIT_RATE_WEIGHT + SS_FA_WEIGHT + (rtScore !== null ? SS_RT_WEIGHT : 0);
+  const attentionScore = Math.max(0, Math.min(100, Math.round(
+    (hitRate * SS_HIT_RATE_WEIGHT + (1 - Math.min(faRate * SS_FA_SCALE, 1)) * SS_FA_WEIGHT + rtComponent)
+    / maxPossible * 100
+    * (1 - decayIndex * SS_DECAY_FACTOR)
+  )));
 
   return { hits, misses, falseAlarms, meanRt, rtVariability, decayIndex, attentionScore };
 }
