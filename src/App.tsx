@@ -18,6 +18,8 @@ import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculation
 import { computeComposite } from "./utils/compositeAxes";
 import { dataQuality, percentileInPool, percentileBand, cvAptitudeGap, positionFit, correlationMatrix, type DataQuality } from "./utils/insights";
 import { extractCvText } from "./utils/cvParse";
+import { ScoreBand } from "./components/ScoreBand";
+import type { DomainReliability } from "./utils/reliability";
 import type { Candidate, CandidateOutcome, CvMatchResult, EnglishLevel, GameEvent, HiringDecision, JobPosition, Role } from "./types";
 
 const APP_NAME = "Psychometric Quest";
@@ -1017,8 +1019,20 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
   );
 }
 
-// Reporte de personalidad Big Five (5 dominios), lenguaje no evaluativo
-function BigFiveReport({ result, audience }: { result: import("./types").BigFiveResult; audience: "candidate" | "admin" }) {
+// Reporte de personalidad Big Five (5 dominios), lenguaje no evaluativo.
+// C4 — el número y la barra .bf-bar se reemplazan por ScoreBand con banda de incertidumbre.
+// domainReliability: cuando se pasa (vista admin), ScoreBand usa interpretable del pool.
+//                    Cuando no se pasa (vista candidato), interpretable queda undefined
+//                    (ScoreBand muestra banda con sem_proxy=10 por defecto).
+function BigFiveReport({
+  result,
+  audience,
+  domainReliability,
+}: {
+  result: import("./types").BigFiveResult;
+  audience: "candidate" | "admin";
+  domainReliability?: Record<BigFiveDomainKey, DomainReliability>;
+}) {
   const hasPartial = result.partialDomains && result.partialDomains.length > 0;
   return (
     <div className="bigfive-report">
@@ -1027,16 +1041,17 @@ function BigFiveReport({ result, audience }: { result: import("./types").BigFive
         // IMP-2 — dominio con ítems sin responder: mostrar superíndice * en el score
         const isPartial = result.partialDomains?.includes(domain.key) ?? false;
         const tendency = value >= 60 ? domain.highLabel : value <= 40 ? domain.lowLabel : "En un punto intermedio entre ambos extremos.";
+        const interpretable = domainReliability?.[domain.key].interpretable;
         return (
           <div className="bf-domain" key={domain.key}>
-            <div className="bf-domain-head">
-              <strong>{domain.name}</strong>
-              <span className="bf-domain-score" style={{ color: domain.color }}>
-                {value}
-                {isPartial && <sup className="bf-partial-marker" aria-label="dominio con ítems sin responder">*</sup>}
-              </span>
-            </div>
-            <div className="bf-bar"><i style={{ width: `${value}%`, background: domain.color }} /></div>
+            {/* C4 — ScoreBand reemplaza bf-domain-head + .bf-bar + número.
+                El label se pasa para el aria-label; se muestra en la primera columna del grid. */}
+            <ScoreBand
+              label={domain.name}
+              value={value}
+              interpretable={interpretable}
+              isPartial={isPartial}
+            />
             <p className="bf-domain-desc">{audience === "candidate" ? `Tiendes a: ${tendency.toLowerCase()}` : tendency}</p>
           </div>
         );
@@ -1097,14 +1112,17 @@ function CandidateReport({ candidate }: { candidate: Candidate }) {
         {candidate.behavioral && (
           <div className="panel">
             <h2>Detalle conductual</h2>
+            {/* C4 — ScoreRow reemplazado por ScoreBand con banda de incertidumbre.
+                interpretable no se pasa (omitido): muestra banda con sem_proxy=10.
+                Cuando C5 entregue SEM real, añadir sem={semValue} e interpretable={bool}. */}
             <div className="score-list">
-              <ScoreRow label="Adaptabilidad" value={candidate.behavioral.adaptability} />
-              <ScoreRow label="Priorización" value={candidate.behavioral.prioritization} />
-              <ScoreRow label="Control ejecutivo" value={candidate.behavioral.executiveControl} />
-              <ScoreRow label="Riesgo calculado" value={candidate.behavioral.calculatedRisk} />
-              {typeof candidate.behavioral.sustainedAttention === "number" && <ScoreRow label="Atención sostenida" value={candidate.behavioral.sustainedAttention} />}
-              {typeof candidate.behavioral.workingMemory === "number" && <ScoreRow label="Memoria de trabajo" value={candidate.behavioral.workingMemory} />}
-              {typeof candidate.behavioral.fluidReasoning === "number" && <ScoreRow label="Razonamiento fluido" value={candidate.behavioral.fluidReasoning} />}
+              <ScoreBand label="Adaptabilidad" value={candidate.behavioral.adaptability} />
+              <ScoreBand label="Priorización" value={candidate.behavioral.prioritization} />
+              <ScoreBand label="Control ejecutivo" value={candidate.behavioral.executiveControl} />
+              <ScoreBand label="Riesgo calculado" value={candidate.behavioral.calculatedRisk} />
+              {typeof candidate.behavioral.sustainedAttention === "number" && <ScoreBand label="Atención sostenida" value={candidate.behavioral.sustainedAttention} />}
+              {typeof candidate.behavioral.workingMemory === "number" && <ScoreBand label="Memoria de trabajo" value={candidate.behavioral.workingMemory} />}
+              {typeof candidate.behavioral.fluidReasoning === "number" && <ScoreBand label="Razonamiento fluido" value={candidate.behavioral.fluidReasoning} />}
             </div>
             <p className="profile-note"><strong>{candidate.behavioral.profile}</strong> resume el patrón observado durante los juegos conductuales. Es una <strong>etiqueta descriptiva</strong>, no un diagnóstico ni un criterio de selección.</p>
           </div>

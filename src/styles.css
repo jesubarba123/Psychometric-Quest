@@ -1315,6 +1315,109 @@ code { font-family: var(--font-display); letter-spacing: 0.04em; }
 }
 .score-row i { animation: score-bar-grow 0.7s var(--ease-spring) both, bar-shimmer 3s linear infinite; }
 
+/* ── Patrón "puntaje con incertidumbre" (C4) ─────────────────────────────────
+   Spec: docs/design/score-uncertainty.md
+   Superficies: ScoreRow (conductual), BigFiveReport, MetricCard 0-100.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.score-band {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* Track base — igual que .score-row div */
+.score-band__track {
+  position: relative;          /* contexto para la zona de incertidumbre */
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid rgba(42, 58, 72, .78);
+}
+
+/* Fill del valor central — igual que .score-row i */
+.score-band__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--amber), var(--signal));
+  background-size: 250% auto;
+  animation: score-bar-grow 0.7s var(--ease-spring) both,
+             bar-shimmer 3s linear infinite;
+}
+
+/*
+  Zona sombreada de incertidumbre.
+  Se posiciona de forma absoluta sobre el track.
+  left y width se calculan en línea desde scoreBand():
+    left  = max(0, value - sem)%
+    width = (min(100, value+sem) - max(0, value-sem))%
+  Donde sem = SEM del scoring (o 10 como proxy cuando C5 no lo entrega aún).
+*/
+.score-band__uncertainty {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--signal-dim);
+  opacity: 0.38;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Columna de valor + categoría verbal */
+.score-band__value-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 52px;             /* evita saltos al cambiar entre rango y "—" */
+}
+
+.score-band__value {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.score-band__category {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.score-band__category--high { color: var(--green);  }
+.score-band__category--mid  { color: var(--muted);  }
+.score-band__category--low  { color: var(--amber);  }
+
+/* Modificador: dominio parcial */
+.score-band--partial {
+  padding-left: 8px;
+  border-left: 3px solid var(--amber);
+  margin-left: -11px;          /* compensa el padding para mantener alineación del grid */
+}
+
+/* Modificador: sin dato (valor undefined/null) */
+.score-band--no-data .score-band__value {
+  color: var(--muted);
+}
+
+/* Movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  .score-band__fill { animation: none; }
+}
+
+/* ── Fin patrón "puntaje con incertidumbre" ──────────────────────────────── */
+
 /* Disclaimer subtle border */
 .disclaimer {
   border-color: rgba(232,169,74,.28);
