@@ -1,175 +1,139 @@
-# QA Audit — Psychometric Quest (RE-AUDITORÍA de seguimiento)
+# QA Audit — Psychometric Quest (Lote P0 · psychometrics-fase0)
 
-**Auditor:** sdet-qa-reviewer · **Fecha:** 2026-06-16 · **Commit base:** `main` (MVP localStorage)
-**Alcance:** verificación en código de los fixes aplicados a los hallazgos del informe previo + búsqueda de regresiones.
-**Método:** lectura directa del código (no se asume). Cada veredicto cita `archivo:línea`.
-
----
-
-## 1. Resumen ejecutivo
-
-**Veredicto:** los **7 hallazgos accionables verificados (C-1, C-2, C-3, C-4, E-1, D-1, D-2) quedaron RESUELTOS** en el
-código actual. No se detectaron regresiones introducidas por los fixes. `npx tsc --noEmit` → **exit 0** (verificado
-en esta sesión).
-
-> **No quedan hallazgos críticos ni altos accionables abiertos en el código.** El único "Alto" del informe anterior
-> (C-1, eventos duplicados al re-tomar) está corregido por reemplazo basado en el `type` de evento, tanto en juegos
-> (`Assessments.onDone`) como en el survey (`Survey.goNext`).
-
-Los hallazgos restantes son los **medios/bajos no accionables-en-código del informe original** (S-1 KDF de demo,
-A-1/A-2/A-3 accesibilidad, P-1/P-2/P-3 rendimiento, T-1/T-2 type-safety) que dependen de decisiones del dueño o de
-trabajo de mejora no urgente, más la **brecha de testing (0 pruebas automatizadas)**, que sigue siendo el riesgo de
-proceso número uno.
-
-### Top 3 focos restantes (no bloqueantes)
-1. **Sin pruebas automatizadas.** Los fixes de C-1/C-3/C-4 son exactamente el tipo de invariante que una suite
-   protegería contra futuras regresiones. Prioridad: red de seguridad (Vitest + RTL).
-2. **Persistencia con `dataUrl` de CV en localStorage.** D-1/D-2 ya evitan el crash y versionan el esquema, pero la
-   decisión de fondo (subir CV a Supabase Storage vs. cuota ~5 MB) sigue pendiente del dueño.
-3. **Validez psicométrica.** C-3 ya elimina el atajo "elige 3 figuras"; queda la revisión de validez de las fórmulas
-   de scoring (no es un bug, es criterio de dominio).
+**Auditor:** sdet-qa-reviewer · **Fecha:** 2026-06-18 · **Rama:** `fix/psychometrics-fase0`
+**Commit HEAD:** `628a396` (docs: auditoría psicométrica actualizada)
+**Alcance:** gates de CI del lote de mejoras psicométricas P0 (scoring, tipos, fiabilidad, UI admin).
+**Método:** ejecución real de los cuatro gates; salida capturada verbatim.
 
 ---
 
-## 2. Verificación de hallazgos previos
+## 1. Resultado de los cuatro gates
 
-| # | Sev orig. | Estado | Evidencia del fix | Notas de verificación |
-|---|-----------|--------|-------------------|-----------------------|
-| **C-1** | Alto | ✅ **RESUELTO** | `src/App.tsx:701-705` y `:947-953` | Ver §2.1. Reemplazo por `type`, no acumulación. Sin regresión. |
-| **C-2** | Bajo | ✅ **RESUELTO** | `src/App.tsx:826` | `onStart={() => setStage("practice")}` directo; ternario tautológico eliminado. |
-| **C-3** | Bajo | ✅ **RESUELTO** | `src/components/RavenMatrices.tsx:55-58` | `countOffset` aleatorio por ítem; respuesta ya no es siempre 3. Regla sigue inferible; distractores únicos. Ver §2.3. |
-| **C-4** | Bajo | ✅ **RESUELTO** | `src/components/Switchboard.tsx:106-108, 118-124, 133-141` | `trialRef` sellado en `beginTrial`; render y scoring leen la misma fuente. Ver §2.4. |
-| **E-1** | Medio | ✅ **RESUELTO** | `src/components/SignalSurge.tsx:207-208, 222, 293, 295` | rAF guardado en `progressRaf`; se detiene si `!trialActive.current`; cancelado en cleanup de desmontaje. Ver §2.5. |
-| **D-1** | Medio-Alto | ✅ **RESUELTO** | `src/lib/storage.ts:149-159` | `saveDatabase` en try/catch, loguea, devuelve `boolean`. Ver §2.6. |
-| **D-2** | Medio | ✅ **RESUELTO** | `src/lib/storage.ts:8, 13, 134, 153` | `SCHEMA_VERSION = 3` sellado al guardar y normalizado al cargar. Ver §2.6. |
+| # | Gate | Comando | Resultado | Evidencia |
+|---|------|---------|-----------|-----------|
+| 1 | Typecheck | `npm run typecheck` | **PASÓ** | `tsc --noEmit` → exit 0, sin líneas de error |
+| 2 | Build | `npm run build` | **PASÓ** | `✓ 1114 modules transformed. built in 2.09s` |
+| 3 | Unit tests | `npm run test:unit` | **PASÓ** | `Test Files 3 passed (3) · Tests 34 passed (34)` |
+| 4 | E2E Playwright | `npm run test:e2e` | **PASÓ** | `6 passed (6.2s)` |
 
-### 2.1 C-1 — Re-tomar prueba duplica eventos · ✅ RESUELTO
+### Gate 1 — Typecheck (`tsc --noEmit`)
 
-**Juegos** (`src/App.tsx:701-705`):
-```ts
-return <GamePlayer key={active} gameKey={active} onDone={(events) => {
-  const incomingTypes = new Set(events.map((event) => event.type));
-  const kept = (work.events ?? []).filter((event) => !incomingTypes.has(event.type));
-  back({ ...work, events: [...kept, ...events] });
-}} onBack={() => back()} />;
 ```
-El set de tipos se construye **a partir de los eventos realmente entregados**, no de una lista hardcodeada. Esto cubre
-correctamente los juegos que emiten **dos tipos** por sesión: `memory_result`+`memory_event`, `raven_result`+`raven_item`,
-`signal_surge_result`+`signal_surge_event` (ver `store` en `:802-808`), así como los de un solo tipo (`switch_answer`,
-`ops_choice`). Al re-tomar, todos los eventos previos de esos tipos se eliminan antes de concatenar → **reemplazo, no
-acumulación.** Confirmado.
-
-**Survey** (`src/App.tsx:947-953`): la rama `isLast` filtra `survey_result` previo antes de añadir el nuevo. Como el survey
-emite un único evento, el filtro por `type !== "survey_result"` es suficiente. Confirmado.
-
-**Sin regresión / edge cases revisados:**
-- `route_risk`: `onDone(rEvents.current)` solo se llama si `rComplete` (`:845`). Si el jugador abandona sin completar las
-  6 rondas, `onDone` no se invoca → no hay reemplazo ni borrado de un intento previo válido. Correcto (no se pierde un
-  intento anterior completo si el actual no se termina).
-- El reemplazo es por **tipo de evento**, no por prueba. Como cada prueba tiene tipos de evento disjuntos respecto de las
-  demás, re-tomar la prueba A no toca los eventos de la prueba B. Verificado contra el catálogo de `store`.
-
-### 2.3 C-3 — Fuga de patrón en Raven · ✅ RESUELTO
-
-`src/components/RavenMatrices.tsx:55-58`:
-```ts
-const countOffset = Math.floor(Math.random() * 3);
-const cell = (r, c) => ({ ..., count: ((c + countOffset) % 3) + 1, ... });
+> psychometric-quest-platform@0.2.0 typecheck
+> tsc --noEmit
+(sin salida de error — exit 0)
 ```
-- **Atajo eliminado:** la respuesta correcta (celda `grid[8]`, columna `c=2`) ahora tiene `count = ((2+offset)%3)+1`,
-  que toma valores **1, 2 o 3** según `offset` aleatorio por ítem. Ya no es "siempre 3".
-- **Regla sigue inferible:** la progresión "+1 cíclico por columna" se observa en las dos filas completas visibles
-  (`grid.slice(0,8)` muestra filas 0 y 1 enteras), así que el candidato puede deducir el conteo de la celda oculta.
-- **Distractores válidos y únicos:** el bloque `tries` perturba un atributo a la vez y se filtra con
-  `!cellEq(t, correct) && !distractors.some(...)` (`:76-79`); el relleno aleatorio (`:85-89`) también deduplica vía
-  `cellEq`. El distractor de conteo `((correct.count)%3)+1` siempre difiere del correcto y queda dentro de {1,2,3}.
-  No se introdujo colisión ni opción duplicada. Confirmado.
 
-### 2.4 C-4 — Doble fuente del índice de ensayo en Switchboard · ✅ RESUELTO
+### Gate 2 — Build (`tsc && vite build`)
 
-`src/components/Switchboard.tsx`:
-- `trialRef` se inicializa y se sella en `beginTrial(index)` (`:108`, `:118-124`), que también hace `setTrial(index)` y
-  `setCardKey`. Render y scoring quedan acoplados al mismo `index`.
-- `answer` lee `const idx = trialRef.current` (`:136`) y deriva figura, regla y corrección de ese índice
-  (`TRIALS[idx]`, `correctSide(idx, ...)`, `idx >= SWITCH_AT`). El evento se registra con `trial: idx` (`:141`).
-- Ya **no** se usa `eventsRef.current.length` como índice de scoring. La fuente de verdad es única. Confirmado.
-- Nota: el render del glifo usa `TRIALS[Math.min(trial, ...)]` (estado `trial`), que `beginTrial` mantiene en sincronía
-  con `trialRef` (ambos se fijan al mismo `index` en la misma llamada). El `lockRef` evita doble registro intra-trial.
-  Sin desincronización observable.
+```
+> psychometric-quest-platform@0.2.0 build
+> tsc && vite build
 
-### 2.5 E-1 — rAF de la barra de progreso de Signal Surge · ✅ RESUELTO
+vite v7.3.5 building client environment for production...
+transforming...
+✓ 1114 modules transformed.
+dist/index.html                              1.24 kB │ gzip:   0.59 kB
+dist/assets/pdf.worker.min-yatZIOMy.mjs  1,375.84 kB
+dist/assets/index-BP8oizsQ.css             117.41 kB │ gzip:  22.73 kB
+dist/assets/d3-D7pkwnt6.js                  92.04 kB │ gzip:  29.76 kB
+dist/assets/pdfjs-D_7eWOn-.js              334.91 kB │ gzip:  98.78 kB
+dist/assets/recharts-xefQSNGZ.js           367.91 kB │ gzip: 104.07 kB
+dist/assets/index-BodfsyzI.js              375.37 kB │ gzip: 117.60 kB
+✓ built in 2.09s
+```
 
-`src/components/SignalSurge.tsx`:
-- `progressRaf = useRef<number>(0)` (`:208`).
-- El loop se auto-reagenda **solo si** `remaining > 0 && trialActive.current` (`:293`), guardando el id en
-  `progressRaf.current` (`:295`). Al expirar el trial (`trialActive.current=false` en auto-expire `:299-302` o en hit
-  `:353`), el siguiente frame no se reagenda.
-- El cleanup de desmontaje cancela el rAF: `if (progressRaf.current) cancelAnimationFrame(progressRaf.current)` (`:222`),
-  junto con el clear de timeouts. **No quedan rAF huérfanos** ni `setProgress` sobre componente desmontado. Confirmado.
+### Gate 3 — Unit tests (Vitest · 3 archivos nuevos del lote P0)
 
-### 2.6 D-1 / D-2 — Persistencia · ✅ RESUELTO
+```
+> psychometric-quest-platform@0.2.0 test:unit
+> vitest run
 
-`src/lib/storage.ts`:
-- **D-1:** `saveDatabase` (`:149-159`) envuelve `localStorage.setItem` en try/catch, hace `console.error` con mensaje de
-  cuota/almacenamiento deshabilitado y **devuelve `boolean`**. Ya no puede tumbar la app por `QuotaExceededError` ni por
-  modo privado de Safari. Confirmado.
-- **D-2:** `SCHEMA_VERSION = 3` (`:8`). `saveDatabase` sella `{ ...db, schemaVersion: SCHEMA_VERSION }` en cada escritura
-  (`:153`). `loadDatabase` normaliza al cargar: `if (parsed.schemaVersion !== SCHEMA_VERSION) parsed.schemaVersion = SCHEMA_VERSION`
-  (`:134`). El tipo `Database` incluye `schemaVersion?: number` (`:13`). Confirmado.
+ RUN  v4.1.9
 
-  **Observación menor (no regresión, mejora futura):** la normalización D-2 hoy solo re-sella el número de versión; no hay
-  una función de migración por-shape (si en el futuro cambia la forma de `Candidate`, se re-sella la versión sin transformar
-  los datos viejos). Es suficiente para el estado actual (no hubo cambio de shape entre v2→v3), pero cuando se introduzca un
-  cambio de esquema real conviene añadir un `migrate(parsed, fromVersion)` antes de re-sellar. **No accionable ahora.**
+ Test Files  3 passed (3)
+      Tests  34 passed (34)
+   Start at  23:56:33
+   Duration  868ms (transform 164ms, setup 0ms, import 215ms, tests 13ms, environment 1.99s)
+```
 
----
+Archivos cubiertos:
+- `src/data/ravenBank.test.ts`
+- `src/lib/assessment.test.ts`
+- `src/utils/reliability.test.ts`
 
-## 3. Hallazgos NUEVOS
+### Gate 4 — E2E Playwright (6 specs · modo demo · puerto 5317)
 
-Ninguno de severidad crítica/alta introducido por los fixes. Observaciones de bajo impacto detectadas durante la
-re-auditoría:
+```
+> psychometric-quest-platform@0.2.0 test:e2e
+> playwright test
 
-| # | Sev | Evidencia | Hallazgo y fix sugerido |
-|---|-----|-----------|--------------------------|
-| N-1 | ✅ RESUELTO | `src/lib/storage.ts:loadDatabase` | `loadDatabase` ahora captura el resultado de `saveDatabase` tras migrar/reinyectar semilla y emite `console.warn` si la persistencia falla (el estado en memoria sigue siendo coherente). Ya no se ignora el `boolean`. |
-| N-2 | ✅ RESUELTO | `src/lib/storage.ts:migrate` | Se añadió la función `migrate(db)` por-forma: normaliza `positions`/`candidates`/`events`, expone el punto de extensión versionado (`if (from < N) { … }`) y sella `SCHEMA_VERSION`. `loadDatabase` la invoca en cada carga. |
-| N-3 | Info | `src/App.tsx:736` | `calculateBehavioral(work.events ?? [])` consume el historial ya deduplicado por C-1; el fix de C-1 es justo lo que mantiene este cálculo estable al re-tomar. Sin acción — confirmación de que el contrato se respeta. |
+Running 6 tests using 4 workers
+
+  ✓  [chromium] › e2e/admin.spec.ts:4:3   › Admin › el admin demo entra al dashboard con exportaciones        (3.1s)
+  ✓  [chromium] › e2e/admin.spec.ts:13:3  › Admin › el dashboard muestra el disclaimer de gobernanza          (2.9s)
+  ✓  [chromium] › e2e/candidate.spec.ts:5:3  › Flujo de candidato › signup por email llega a pantalla de intro (2.5s)
+  ✓  [chromium] › e2e/candidate.spec.ts:10:3 › Flujo de candidato › onboarding completo llega al menú de pruebas (4.0s)
+  ✓  [chromium] › e2e/smoke.spec.ts:4:3   › Smoke › la pantalla de login carga con sus accesos                (1.1s)
+  ✓  [chromium] › e2e/smoke.spec.ts:11:3  › Smoke › modo demo local está activo (sin Supabase)                (1.0s)
+
+  6 passed (6.2s)
+```
 
 ---
 
-## 4. Estado de la brecha de testing (sin cambios)
+## 2. Bugs / fallos detectados
 
-**Sigue en 0 pruebas automatizadas.** Es la recomendación pendiente de mayor valor. Tras los fixes, los tests de
-regresión más rentables son exactamente:
-1. **C-1:** jugar Switchboard (u Ops) 2× y verificar que `switch_answer`/`ops_choice` no se duplican; survey 2× sin
-   duplicar `survey_result`. (Vitest + RTL sobre `Assessments`/`Survey`.)
-2. **C-3:** propiedad sobre `genItem` con 10k seeds — la opción correcta no es siempre la de 3 figuras; 6 opciones
-   únicas; `answer` válido.
-3. **C-4:** Switchboard — input rápido bajo `lockRef` no desincroniza figura mostrada vs. puntuada.
-4. **E-1:** montar/desmontar SignalSurge a mitad de trial sin warnings de setState; spy en `cancelAnimationFrame`.
-5. **D-1:** mock de `setItem` que lanza `QuotaExceededError` → `saveDatabase` devuelve `false` y no propaga.
-
-**Setup recomendado (sin cambios):** Vitest + @testing-library/react + jsdom; Playwright para el flujo E2E del candidato.
+**Ninguno.** Los cuatro gates completaron en verde en la primera pasada. No hay fallos que clasificar ni reintentos necesarios.
 
 ---
 
-## 5. Qué debe hacer el dueño (Jesús)
+## 3. Briefs de arreglo delegados
 
-Pendientes del informe anterior que NO son fixes de código y siguen vigentes:
-1. **Aprobar framework de test + CI** (`tsc`, `build`, `test` por PR). Hoy no hay red de seguridad automatizada.
-2. **Decidir almacenamiento del CV/foto** (Supabase Storage vs. `dataUrl` en localStorage). D-1/D-2 ya cubren el fallo de
-   cuota, pero la decisión de fondo sigue abierta.
-3. **Verificar RLS en Supabase** y postura de PII (la anon key viaja al cliente por diseño).
-4. **Confirmar/documentar que la auth local SHA-256 es solo demo** (S-1) y que producción usa Supabase.
-5. **Validación psicométrica** de las fórmulas de scoring (C-3 ya cierra el atajo de Raven; falta criterio de dominio).
+**No aplica.** Sin fallos, no se emiten briefs.
 
 ---
 
-## 6. Conclusión
+## 4. Estado tras reintentos
 
-Los fixes aplicados a C-1, C-2, C-3, C-4, E-1, D-1 y D-2 están **correctamente implementados y verificados en el código
-actual**, sin regresiones detectadas. `tsc --noEmit` pasa limpio. **No quedan hallazgos críticos ni altos accionables en
-el código.** El backlog restante es: (a) red de seguridad de pruebas automatizadas, (b) decisiones del dueño
-(almacenamiento CV, RLS, framework de test), y (c) mejoras no urgentes de accesibilidad/rendimiento/type-safety ya
-catalogadas en el informe original. Recomendación inmediata: instalar Vitest + RTL y blindar C-1/C-3/C-4 con tests de
-regresión antes del próximo cambio funcional.
+No se requirió ningún reintento. Todo verde en ronda 1.
+
+---
+
+## 5. Brechas de testing
+
+Las siguientes áreas no tienen cobertura automatizada y representan el próximo valor máximo de inversión en tests:
+
+| Prioridad | Brecha | Test recomendado | Agente |
+|-----------|--------|------------------|--------|
+| Alta | Lógica de scoring de `assessment.ts` (normalización IRT, bancos de ítems) | Vitest unit — cubrir al menos p50/p95 del espacio de inputs | `test-author` |
+| Alta | `reliability.ts` — alpha de Cronbach y split-half con N pequeño (N=1, N=2) | Vitest unit — edge cases de división por cero y arrays vacíos | `test-author` |
+| Alta | Flujo candidato completo: terminar UNA prueba y verificar que el resultado aparece en el admin | Playwright E2E — extender `candidate.spec.ts` | `test-author` |
+| Media | `ravenBank` — propiedad: ningún ítem tiene la respuesta correcta siempre en la misma posición | Vitest property-based (fast-check) sobre `genItem` | `test-author` |
+| Media | Badge "no interpretable" visible en admin cuando fiabilidad < umbral | Playwright E2E — extender `admin.spec.ts` | `test-author` |
+| Baja | Re-tomar prueba no duplica eventos (regresión de C-1) | Vitest + RTL sobre `Assessments` | `test-author` |
+| Baja | `saveDatabase` devuelve `false` y no propaga cuando `setItem` lanza `QuotaExceededError` | Vitest unit con mock de `localStorage` | `test-author` |
+
+---
+
+## 6. Veredicto de despliegue
+
+**La suite respalda avanzar. El lote P0 está LISTO.**
+
+Los cuatro gates de CI del lote `fix/psychometrics-fase0` pasaron sin fallos ni reintentos:
+
+- `tsc --noEmit` — exit 0 (sin errores de tipo en los tipos nuevos `partialDomains`, `meanRt?: number`).
+- `vite build` — 1114 módulos, sin warnings que bloqueen.
+- Vitest — 34 tests / 3 archivos (ravenBank, assessment, reliability), todos verdes.
+- Playwright — 6/6 specs E2E en modo demo (sin Supabase, sin `.env`), todos verdes.
+
+**Pendientes no bloqueantes** heredados del audit anterior que siguen vigentes:
+1. Aprobación del framework de CI por PR (hoy se corre manualmente).
+2. Decisión sobre almacenamiento del CV/foto (Supabase Storage vs. localStorage).
+3. Verificación de RLS en Supabase y postura de PII.
+4. Confirmar/documentar que la auth local SHA-256 es solo demo.
+5. Validación psicométrica formal de las fórmulas de scoring (criterio de dominio, no bug de código).
+
+---
+
+*Audit generado automáticamente por el agente sdet-qa-reviewer en la sesión de 2026-06-18.*
