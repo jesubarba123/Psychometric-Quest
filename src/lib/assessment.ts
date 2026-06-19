@@ -31,10 +31,20 @@ export function calculateBehavioral(events: GameEvent[]): BehavioralScores {
   const riskLevel = average(routeEvents.map((event) => Number(event.payload.risk ?? 0)));
   const recovery = recoveryAfterLoss(routeEvents);
 
-  const adaptability = clamp(Math.round(secondAccuracy * 72 + switchAccuracy * 18 + recovery * 10), 18, 96);
+  // Psicometría honesta: si recovery es null (no hubo pérdida medible), se excluye
+  // del promedio en lugar de usar el placeholder 0.65. Cada componente solo aporta
+  // cuando hay datos reales; los pesos se redistribuyen de forma implícita al omitir
+  // el término. Decisión: excluir > inventar (opción psicométricamente honesta C3).
+  const adaptability = clamp(
+    Math.round(secondAccuracy * 72 + switchAccuracy * 18 + (recovery !== null ? recovery * 10 : 0)),
+    18, 96
+  );
   const prioritization = clamp(Math.round(opsOptimal * 74 + impactBias * 5 + Math.max(0, impactBias - urgencyBias) * 7), 20, 97);
   const executiveControl = clamp(Math.round(switchAccuracy * 55 + Math.max(0, 1200 - avgRt) / 18 + opsOptimal * 15), 18, 95);
-  const calculatedRisk = clamp(Math.round(42 + riskLevel * 62 + recovery * 18), 18, 96);
+  const calculatedRisk = clamp(
+    Math.round(42 + riskLevel * 62 + (recovery !== null ? recovery * 18 : 0)),
+    18, 96
+  );
 
   return {
     adaptability,
@@ -50,25 +60,55 @@ export function calculateBehavioral(events: GameEvent[]): BehavioralScores {
 
 // Puntúa el Big Five (IPIP-50): aplica keying inverso, suma por dominio (10–50),
 // normaliza a 0–100, y calcula un índice de inconsistencia (respuesta incoherente).
+//
+// C3 — Ítems faltantes: ya NO se imputan a 3 (neutral) en silencio.
+// Si algún ítem de un dominio no tiene respuesta, el dominio se incluye en
+// `partialDomains`. El score del dominio se calcula solo con los ítems respondidos
+// (re-escalando la normalización al rango real de los ítems disponibles), lo que
+// produce un valor provisional; el consumidor debe interpretar `partialDomains` para
+// decidir si mostrar el resultado o marcarlo como incompleto.
+// Decisión psicométrica: reportar faltante explícito > inventar valor neutral.
 export function calculateBigFive(answers: Record<string, number>): BigFiveResult {
   const domains = {} as Record<BigFiveDomainKey, number>;
   const inconsistencies: number[] = [];
+  const partialDomains: BigFiveDomainKey[] = [];
 
   for (const domain of bigFiveDomains) {
     const items = bigFiveQuestions.filter((question) => question.domain === domain.key);
     let sum = 0;
+    let respondedCount = 0;
     const directKeyed: number[] = [];   // ítems directos, ya en escala 1–5
     const reverseKeyed: number[] = [];  // ítems inversos, re-keyados a escala "directa"
 
     for (const item of items) {
-      const value = answers[item.id] ?? 3; // neutral si falta
-      const effective = item.keyed === 1 ? value : 6 - value;
+      const rawValue = answers[item.id];
+      if (rawValue === undefined) {
+        // Ítem sin respuesta: NO imputamos. Lo omitimos del cálculo.
+        continue;
+      }
+      respondedCount++;
+      const effective = item.keyed === 1 ? rawValue : 6 - rawValue;
       sum += effective;
-      if (item.keyed === 1) directKeyed.push(value);
-      else reverseKeyed.push(6 - value); // re-keyado para comparar en la misma dirección
+      if (item.keyed === 1) directKeyed.push(rawValue);
+      else reverseKeyed.push(6 - rawValue); // re-keyado para comparar en la misma dirección
     }
 
-    domains[domain.key] = Math.round(((sum - 10) / 40) * 100);
+    // Marcar como parcial si no todos los ítems fueron respondidos
+    if (respondedCount < items.length) {
+      partialDomains.push(domain.key);
+    }
+
+    if (respondedCount === 0) {
+      // Sin ninguna respuesta: asignamos 50 (punto medio) como valor de posición
+      // únicamente para que el tipo sea siempre number; el consumidor debe usar
+      // partialDomains para ignorar este valor o marcarlo como no disponible.
+      domains[domain.key] = 50;
+    } else {
+      // Normalización al rango real de los ítems respondidos (respondedCount * 1 mín → respondedCount * 5 máx)
+      const minPossible = respondedCount;
+      const maxPossible = respondedCount * 5;
+      domains[domain.key] = Math.round(((sum - minPossible) / (maxPossible - minPossible)) * 100);
+    }
 
     // Inconsistencia del dominio: |media de directos − media de inversos re-keyados|.
     // Si la persona responde coherentemente, ambas medias se parecen (diferencia baja).
@@ -79,7 +119,7 @@ export function calculateBigFive(answers: Record<string, number>): BigFiveResult
   }
 
   const inconsistency = Math.round(inconsistencies.length ? average(inconsistencies) : 0);
-  return { domains, answeredAt: new Date().toISOString(), inconsistency };
+  return { domains, answeredAt: new Date().toISOString(), inconsistency, partialDomains };
 }
 
 // Arquetipos conductuales definidos por su FIRMA: qué ejes destacan (+) o se
@@ -138,9 +178,14 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function recoveryAfterLoss(events: GameEvent[]) {
+// Devuelve la proporción de elecciones moderadas tras la primera pérdida (0–1),
+// o null cuando no hubo pérdida medible. El null indica "dato no disponible",
+// no un valor real: el llamador debe excluirlo del cálculo en vez de sustituirlo
+// por una constante inventada. (C3: eliminado placeholder 0.65)
+function recoveryAfterLoss(events: GameEvent[]): number | null {
   const firstLoss = events.findIndex((event) => event.payload.failed);
-  if (firstLoss < 0 || firstLoss >= events.length - 1) return 0.65;
+  // Sin pérdida, o la pérdida fue el último evento → no hay nada posterior que medir.
+  if (firstLoss < 0 || firstLoss >= events.length - 1) return null;
   const after = events.slice(firstLoss + 1);
   const moderate = after.filter((event) => event.payload.choice === "probe" || event.payload.choice === "safe").length;
   return ratio(moderate, after.length);

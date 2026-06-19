@@ -12,7 +12,9 @@ export type SignalSurgeResult = {
   hits: number;
   misses: number;
   falseAlarms: number;
-  meanRt: number;
+  /** Tiempo de reacción medio en ms. undefined cuando no hubo hits (C3: eliminado
+   *  placeholder 999 que contaminaba rtScore y los agregados de atención). */
+  meanRt: number | undefined;
   rtVariability: number;   // std-dev of reaction times — measure of consistency
   decayIndex: number;      // performance drop from phase 1→3, 0–1
   attentionScore: number;  // composite 0–100
@@ -47,13 +49,19 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
 }
 
-function computeResult(events: SignalEvent[]): SignalSurgeResult {
+// C3 — computeResult es exportada para permitir tests unitarios sin instanciar el componente.
+export function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const hits = events.filter(e => e.type === "hit").length;
   const misses = events.filter(e => e.type === "miss").length;
   const falseAlarms = events.filter(e => e.type === "false_alarm").length;
   const rts = (events.filter(e => e.type === "hit") as Extract<SignalEvent, { type: "hit" }>[]).map(e => e.rt);
 
-  const meanRt = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 999;
+  // C3 — meanRt es undefined cuando no hay hits, no 999.
+  // Un meanRt=999 era un placeholder inventado que entraba a rtScore y deformaba
+  // attentionScore. undefined indica "dato no disponible" y se excluye del cálculo.
+  const meanRt: number | undefined = rts.length
+    ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length)
+    : undefined;
   const rtVariability = Math.round(stdDev(rts));
 
   // decayIndex: compare hit rate in phase 1 vs phase 3
@@ -75,9 +83,13 @@ function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const PHASES_PLAYED = Math.max(1, ...events.map(e => e.phase));
   const distractorTrials = Math.round(TRIALS_PER_PHASE * (1 - TARGET_RATIO)) * PHASES_PLAYED;
   const faRate = falseAlarms / Math.max(1, distractorTrials);
-  const rtScore = Math.max(0, 1 - (meanRt - 200) / 700);
+  // C3 — rtScore solo se calcula cuando hay un meanRt real; sin hits no aporta al composite.
+  // Decisión: excluir el componente RT del composite cuando no hay datos de RT,
+  // redistribuyendo su peso (25 pts) entre hitRate (50) y faRate (25) implícitamente.
+  const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - 200) / 700) : null;
+  const rtComponent = rtScore !== null ? rtScore * 25 : 0;
   const attentionScore = Math.round(
-    (hitRate * 50 + (1 - Math.min(faRate * 5, 1)) * 25 + rtScore * 25) * (1 - decayIndex * 0.2)
+    (hitRate * 50 + (1 - Math.min(faRate * 5, 1)) * 25 + rtComponent) * (1 - decayIndex * 0.2)
   );
 
   return { hits, misses, falseAlarms, meanRt, rtVariability, decayIndex, attentionScore };
@@ -150,7 +162,11 @@ const ResultsScreen: React.FC<{ result: SignalSurgeResult; onContinue: () => voi
           <span className="ss-stat-lbl">Falsas alarmas</span>
         </div>
         <div className="ss-stat-card">
-          <span className="ss-stat-val">{result.meanRt}<span className="ss-stat-unit">ms</span></span>
+          <span className="ss-stat-val">
+            {result.meanRt !== undefined
+              ? <>{result.meanRt}<span className="ss-stat-unit">ms</span></>
+              : <span className="ss-stat-na" aria-label="Sin datos de tiempo de reacción">—</span>}
+          </span>
           <span className="ss-stat-lbl">TR medio</span>
         </div>
         <div className="ss-stat-card">

@@ -27,6 +27,9 @@ export type BigFiveResult = {
   domains: Record<BigFiveDomainKey, number>; // 0-100 por dominio
   answeredAt: string;
   inconsistency: number;                      // 0-100, señal de respuesta incoherente
+  /** Dominios con al menos un ítem sin respuesta. Array vacío = todos completos.
+   *  (C3: refleja faltantes explícitamente en vez de imputar a neutral) */
+  partialDomains: BigFiveDomainKey[];
 };
 
 export type Candidate = {
