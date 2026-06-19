@@ -11,6 +11,7 @@ import RavenMatrices, { type RavenResult } from "./components/RavenMatrices";
 import { CandidateScatter3D } from "./components/analytics/CandidateScatter3D";
 import { PsychometricDashboard } from "./components/analytics/PsychometricDashboard";
 import { MeasurementReference } from "./components/analytics/MeasurementReference";
+import { ReliabilitySection } from "./components/analytics/ReliabilitySection";
 import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, loadDatabase, recordCandidateAccess, upsertCandidate } from "./lib/storage";
 import { isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
 import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculations";
@@ -1417,7 +1418,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <section className="workbench">
-      {showMeasRef && <MeasurementReference onClose={() => setShowMeasRef(false)} />}
+      {showMeasRef && <MeasurementReference onClose={() => setShowMeasRef(false)} candidates={db.candidates} />}
       <div className="section-head">
         <div>
           <p className="eyebrow">Administrador</p>
@@ -1667,6 +1668,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
           <div className="domain-bars">
             {bigFiveAverages.map((item) => <Bar key={item.key} label={item.name} value={item.avg} />)}
           </div>
+          <ReliabilitySection candidates={db.candidates} />
         </div>
       </div>
       <div className="panel">

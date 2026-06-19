@@ -1752,6 +1752,51 @@ body {
 .measref-domain span { color: var(--muted); font-size: 12px; }
 .measref-caution { margin: 18px 0 0; padding: 12px 14px; border: 1px solid rgba(232,169,74,.3); border-radius: 10px; background: rgba(232,169,74,.08); color: var(--amber); font-size: 13px; line-height: 1.5; }
 
+/* ── Sección de fiabilidad (C2) ──────────────────────────────── */
+.reliability-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.reliability-title { margin: 0 0 8px; font-family: var(--font-display); font-size: 17px; color: var(--ink); }
+.reliability-intro { margin: 0 0 14px; font-size: 13px; }
+.reliability-empty { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font-size: 13px; }
+.reliability-table { display: grid; gap: 6px; }
+.reliability-table-head {
+  display: grid;
+  grid-template-columns: 1fr 52px 40px auto;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+}
+.reliability-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.reliability-domain-name { font-size: 14px; font-weight: 700; }
+.reliability-stats { display: flex; gap: 16px; margin: 0; }
+.reliability-stats > div { display: flex; align-items: center; gap: 5px; }
+.reliability-stats dt { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.reliability-stats dd { margin: 0; font-size: 14px; font-weight: 800; }
+.reliability-alpha--good { color: var(--green); }
+.reliability-alpha--ok   { color: var(--signal); }
+.reliability-alpha--low  { color: var(--amber); }
+.reliability-alpha--null { color: var(--muted); }
+.reliability-n--ok  { color: var(--ink); }
+.reliability-n--low { color: var(--amber); }
+.reliability-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.reliability-badge--ok  { color: var(--green);  background: rgba(92,184,138,.14);  border: 1px solid rgba(92,184,138,.28); }
+.reliability-badge--low { color: var(--amber); background: rgba(232,169,74,.12); border: 1px solid rgba(232,169,74,.28); }
+.reliability-note { margin: 12px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
 /* ── Menú de pruebas del candidato ───────────────────────────── */
 .assessment-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 22px 0; }
 .assessment-card {
