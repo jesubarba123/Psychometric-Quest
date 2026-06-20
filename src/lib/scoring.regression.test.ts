@@ -155,7 +155,13 @@ describe("REGRESIÓN calculateBehavioral — Fixture B (sin rutas, recovery=null
 // ─── Suite B: computeComposite ────────────────────────────────────────────────
 
 // Candidato mínimo con solo behavioral (sin eventos de juego para signal/frog).
-// cognition     = meanDefined([executiveControl=95, undefined, undefined, undefined]) = 95
+// cognition     = meanDefined([executiveControl=95, sustainedAttention=undef,
+//                              workingMemory=undef, fluidReasoning=undef]) = 95
+//                 NOTA C6: processingSpeed ya NO entra (fue eliminada en C6).
+//                 Antes de C6 era meanDefined([95, undef, undef, undef, undef]) = 95
+//                 — el valor no cambia aquí porque processingSpeed también era undef
+//                 (sin signal events). El cambio de C6 es efectivo solo cuando
+//                 hay eventos de Signal Surge que produzcan processingSpeed.
 // strategy      = meanDefined([prioritization=68, adaptability=73, null]) = (68+73)/2 = 70.5
 // riskCalibrated: riskCalibration(83) → 83>75 → dist=8 → 100-8*2.4=80.8;
 //                 meanDefined([80.8, null]) = 80.8
@@ -336,5 +342,192 @@ describe("REGRESIÓN buildCandidateProfileFromEvents (baseline C5)", () => {
     expect(result).not.toBeNull();
     expect(result!.profile.frog).not.toBeNull();
     expect(result!.profile.signal).not.toBeNull();
+  });
+});
+
+// ─── Suite D: C6 — un solo canal RT en cognición ─────────────────────────────
+//
+// PROPÓSITO DEL TEST:
+//   Verificar que perturbar meanRt (cambiando los RT de los hits de Signal Surge)
+//   mueve `cognition` a través de UN SOLO canal (sustainedAttention) y NO a través
+//   de un segundo canal independiente (processingSpeed).
+//
+// RAZONAMIENTO:
+//   Antes de C6, `computeComposite` incluía tanto `sustainedAttention` como
+//   `processingSpeed` en la media de cognición. Ambas dependen de `meanRt`:
+//     - sustainedAttention: rtScore = 1 − (meanRt − 200)/700, con peso 25/100
+//     - processingSpeed: (1 − (meanRt − 200)/700) × 100 (función pura de meanRt)
+//   Resultado: un cambio en meanRt producía dos cambios independientes en cognición
+//   (doble conteo). Eso infla artificialmente la varianza de cognición atribuible a RT.
+//
+//   Tras C6: solo `sustainedAttention` permanece. Un cambio en meanRt mueve
+//   cognición una sola vez, a través de sustainedAttention.
+//
+// ESTRATEGIA DEL TEST:
+//   1. Construimos dos sets de eventos de señal idénticos EXCEPTO por el RT de los hits
+//      (RT rápido = 300 ms; RT lento = 700 ms). Mismo hitRate, mismo faRate.
+//   2. Calculamos los perfiles del candidato con cada set y medimos el cambio en cognición.
+//   3. Verificamos que el cambio en cognición es IGUAL al cambio en sustainedAttention
+//      (un solo canal). Si hubiera doble canal, el cambio en cognición sería mayor.
+//   4. Verificamos explícitamente que `processingSpeed` es diferente entre los dos sets
+//      (confirma que la perturbación de RT sí es detectable, solo que no entra a cognición).
+//
+// DERIVACIÓN DEL BASELINE (C6, 2026-06-20):
+//
+//   Fixture C6-FAST: 4 hits (todos rt=300), 2 misses fase 1; 4 hits (rt=300), 2 misses fase 2;
+//                    4 hits (rt=300), 2 misses fase 3. Total: 12 hits, 6 misses, 0 FA.
+//   Fixture C6-SLOW: idéntico pero rt=700 en todos los hits.
+//
+//   Para C6-FAST (meanRt=300):
+//     hitRate = 12/18 = 0.6667
+//     faRate  = 0 / (6×3=18 distractores) = 0
+//     rtScore = clamp(1 − (300−200)/700) = clamp(6/7) ≈ 0.8571
+//     rtComponent = 0.8571 × 25 = 21.43
+//     maxPossible = 100 (hay RT)
+//     hitRateByPhase = [4/6, 4/6, 4/6] = [0.667, 0.667, 0.667]
+//     decayIndex = max(0, 0.667 − 0.667) = 0
+//     rawComposite = 0.667×50 + (1−0)×25 + 21.43 = 33.33 + 25 + 21.43 = 79.76
+//     sustainedAttention = clamp(round(79.76/100 × 100 × (1−0×0.2))) = clamp(round(79.76)) = 80
+//     processingSpeed    = clamp(round((1 − (300−200)/700) × 100)) = clamp(round(85.71)) = 86
+//
+//   Para C6-SLOW (meanRt=700):
+//     rtScore = clamp(1 − (700−200)/700) = clamp(1 − 500/700) = clamp(0.2857) = 0.2857
+//     rtComponent = 0.2857 × 25 = 7.14
+//     rawComposite = 0.667×50 + 25 + 7.14 = 33.33 + 25 + 7.14 = 65.47
+//     sustainedAttention = clamp(round(65.47)) = 65
+//     processingSpeed    = clamp(round((1 − 500/700) × 100)) = clamp(round(28.57)) = 29
+//
+//   Candidato con executiveControl=80, sin otros behavioral scores, sin frog events.
+//
+//   cognition_FAST (tras C6):
+//     meanDefined([executiveControl=80, sustainedAttention=80, undefined, undefined]) = (80+80)/2 = 80
+//
+//   cognition_SLOW (tras C6):
+//     meanDefined([executiveControl=80, sustainedAttention=65, undefined, undefined]) = (80+65)/2 = 72.5
+//
+//   delta_cognition_C6 = 80 − 72.5 = 7.5 (un solo canal: vía sustainedAttention)
+//
+//   Si processingSpeed aún estuviera en el composite (pre-C6):
+//     cognition_FAST = (80+80+86)/3 = 82
+//     cognition_SLOW = (80+65+29)/3 = 58
+//     delta = 82 − 58 = 24 (dos canales inflaban el delta)
+
+// Crea un candidato con:
+//   - behavioral.sustainedAttention fijado explícitamente (simula el valor
+//     registrado desde la pantalla final del juego vía signal_surge_result)
+//   - events con signal_surge_event de RT conocido (produce processingSpeed
+//     cuando buildCandidateProfileFromEvents los analiza)
+// Este diseño refleja el flujo real: el juego graba signal_surge_result con
+// attentionScore calculado, y computeComposite lo lee de b.sustainedAttention.
+// Los signal_surge_event también se persisten y producen processingSpeed en el
+// análisis de events. Ambas métricas dependen del mismo meanRt → doble canal
+// antes de C6; canal único tras C6.
+function makeCandidateWithSignalEvents(
+  events: GameEvent[],
+  executiveControl: number,
+  sustainedAttention: number,
+): Candidate {
+  return {
+    id: "c6-test-candidate",
+    name: "C6 Test",
+    email: "c6@example.com",
+    roleTarget: "Dev",
+    invitationCode: "C6-0000",
+    status: "completed",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    behavioral: {
+      adaptability: 70,
+      prioritization: 70,
+      executiveControl,
+      calculatedRisk: 60,
+      sustainedAttention,  // valor fijado desde signal_surge_result (refleja meanRt)
+      workingMemory: undefined,
+      fluidReasoning: undefined,
+      profile: "Resolvedor situacional",
+    },
+    events,
+  };
+}
+
+// 4 hits + 2 misses por fase (3 fases) → 12 hits, 6 misses, 0 FA
+function makeSignalEventsWithRt(rt: number): GameEvent[] {
+  const events: GameEvent[] = [];
+  for (let phase = 1; phase <= 3; phase++) {
+    for (let i = 0; i < 4; i++) {
+      events.push(makeEvent("signal_surge_event", { type: "hit", rt, phase }));
+    }
+    for (let i = 0; i < 2; i++) {
+      events.push(makeEvent("signal_surge_event", { type: "miss", phase }));
+    }
+  }
+  return events;
+}
+
+describe("C6 — un solo canal RT en cognición (no doble conteo)", () => {
+  // Perturbamos meanRt entre 300 ms (rápido) y 700 ms (lento).
+  // El mismo set de hits/misses/FA asegura que hitRate y faRate son idénticos;
+  // solo cambia RT. Así aislamos el efecto de meanRt en cognición.
+  const FAST_EVENTS = makeSignalEventsWithRt(300);
+  const SLOW_EVENTS = makeSignalEventsWithRt(700);
+  const EXEC = 80;
+  // sustainedAttention fijado a partir de los events (derivación en comentario de suite):
+  // FAST: 80, SLOW: 65
+  const SA_FAST = 80;
+  const SA_SLOW = 65;
+
+  it("signal events FAST producen sustainedAttention=80 vía buildCandidateProfileFromEvents", () => {
+    // Verifica que los eventos FAST producen el sustainedAttention que luego se
+    // almacenaría en behavioral.sustainedAttention (via signal_surge_result).
+    const analysis = buildCandidateProfileFromEvents(FAST_EVENTS);
+    expect(analysis?.profile.signal?.sustainedAttention).toBe(SA_FAST);
+  });
+
+  it("signal events SLOW producen sustainedAttention=65 vía buildCandidateProfileFromEvents", () => {
+    const analysis = buildCandidateProfileFromEvents(SLOW_EVENTS);
+    expect(analysis?.profile.signal?.sustainedAttention).toBe(SA_SLOW);
+  });
+
+  it("processingSpeed-FAST = 86 y processingSpeed-SLOW = 29 (confirma perturbación real de RT)", () => {
+    // Este test confirma que meanRt SÍ difiere entre fixtures (la perturbación es real).
+    // Si ambos dieran el mismo processingSpeed, el test no probaría nada.
+    const analysisFast = buildCandidateProfileFromEvents(FAST_EVENTS);
+    const analysisSlow = buildCandidateProfileFromEvents(SLOW_EVENTS);
+    expect(analysisFast?.profile.radarDimensions.processingSpeed).toBe(86);
+    expect(analysisSlow?.profile.radarDimensions.processingSpeed).toBe(29);
+  });
+
+  it("cognition-FAST = 80 = (executiveControl=80 + sustainedAttention=80) / 2", () => {
+    // Baseline C6: processingSpeed ya NO entra al composite.
+    // Si entrara: (80+80+86)/3 ≈ 82.
+    // Que cognition = 80 (no 82) confirma que solo hay un canal RT.
+    const candidateFast = makeCandidateWithSignalEvents(FAST_EVENTS, EXEC, SA_FAST);
+    const composite = computeComposite(candidateFast);
+    expect(composite).not.toBeNull();
+    expect(composite!.cognition).toBeCloseTo(80, 5);
+  });
+
+  it("cognition-SLOW = 72.5 = (executiveControl=80 + sustainedAttention=65) / 2", () => {
+    // Baseline C6: processingSpeed ya NO entra al composite.
+    // Si entrara: (80+65+29)/3 ≈ 58.
+    // Que cognition = 72.5 (no 58) confirma que solo hay un canal RT.
+    const candidateSlow = makeCandidateWithSignalEvents(SLOW_EVENTS, EXEC, SA_SLOW);
+    const composite = computeComposite(candidateSlow);
+    expect(composite).not.toBeNull();
+    expect(composite!.cognition).toBeCloseTo(72.5, 5);
+  });
+
+  it("delta cognición RT-rápido vs RT-lento = 7.5 (un solo canal, no dos)", () => {
+    // PRUEBA CENTRAL DE C6:
+    // delta = cognition_FAST − cognition_SLOW = 80 − 72.5 = 7.5.
+    // Este delta corresponde exactamente al cambio en sustainedAttention (80 − 65 = 15)
+    // dividido entre 2 (la media incluye executiveControl=80 que no cambia): 15/2 = 7.5.
+    // Si processingSpeed aún entrara, delta sería (80+80+86)/3 − (80+65+29)/3 = 82−58 = 24.
+    // Un delta = 7.5 (no 24) es evidencia de un solo canal RT en cognición.
+    const candidateFast = makeCandidateWithSignalEvents(FAST_EVENTS, EXEC, SA_FAST);
+    const candidateSlow = makeCandidateWithSignalEvents(SLOW_EVENTS, EXEC, SA_SLOW);
+    const cFast = computeComposite(candidateFast)!;
+    const cSlow = computeComposite(candidateSlow)!;
+    const delta = cFast.cognition - cSlow.cognition;
+    expect(delta).toBeCloseTo(7.5, 5);
   });
 });

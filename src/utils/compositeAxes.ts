@@ -4,7 +4,13 @@
 //
 // Ejes (cada uno 0-100, "más alto = mejor"):
 //   · COGNICIÓN        — recursos de procesamiento: control ejecutivo, atención
-//                         sostenida, memoria de trabajo (+ velocidad de procesamiento)
+//                         sostenida, memoria de trabajo, razonamiento fluido.
+//                         NOTA C6: processingSpeed (RT puro de Signal Surge) fue excluido
+//                         del composite en C6 porque el mismo meanRt ya entra en
+//                         sustainedAttention (25 % de su peso). Incluir ambos contaría
+//                         la varianza de meanRt dos veces. Decisión: mantener
+//                         sustainedAttention (integra hitRate + FA + RT) y excluir
+//                         processingSpeed (redundante). Ver docs/SCORING.md §3 (C6).
 //   · ESTRATEGIA       — juicio adaptativo: priorización, adaptabilidad
 //                         (+ calidad de decisión del juego de riesgo)
 //   · RIESGO CALIBRADO — riesgo dentro de la banda óptima + resiliencia a la pérdida
@@ -53,15 +59,18 @@ export function computeComposite(candidate: Candidate): CompositeProfile | null 
   // Métricas opcionales derivadas de los eventos crudos de los juegos.
   const analysis = buildCandidateProfileFromEvents(candidate.events ?? []);
   const frog = analysis?.profile.frog ?? null;
-  const signal = analysis?.profile.signal ?? null;
-  const processingSpeed = signal ? analysis?.profile.radarDimensions.processingSpeed : undefined;
 
+  // C6 — processingSpeed excluida del composite cognición.
+  // Razón: processingSpeed = f(meanRt) puro; sustainedAttention ya incorpora meanRt
+  // como uno de sus tres componentes (peso 25/100). Incluir ambos en la media
+  // aritmética contaría la varianza de meanRt dos veces (doble canal).
+  // Decisión honesta: un único canal RT vía sustainedAttention.
+  // ver docs/SCORING.md §3 (C6).
   const cognition = clamp(meanDefined([
     b.executiveControl,
     b.sustainedAttention,
     b.workingMemory,
     b.fluidReasoning,
-    processingSpeed,
   ]));
 
   const strategy = clamp(meanDefined([

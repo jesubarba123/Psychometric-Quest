@@ -1060,6 +1060,12 @@ function BigFiveReport({
       {hasPartial && (
         <p className="bf-partial-legend">* Dominio con ítems sin responder: interpretar con precaución.</p>
       )}
+      {/* C7 — aclaración de escala: 0–100 es posición en el rango teórico del instrumento,
+          NO un percentil poblacional ni una comparación normada.
+          Mapeo: suma de ítems 10–50 → 0–100 lineal. Ver docs/SCORING.md §4 (C7). */}
+      <p className="bf-partial-legend">
+        Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales.
+      </p>
       {result.inconsistency > 60 && audience === "admin" && (
         <p className="bf-inconsistency">⚠ Índice de inconsistencia alto ({result.inconsistency}/100): posibles respuestas incoherentes o poco cuidadosas. Interpretar con cautela.</p>
       )}

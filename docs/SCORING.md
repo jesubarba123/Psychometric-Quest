@@ -141,6 +141,36 @@ Los tres índices son medias aritméticas sin ponderar (`meanDefined`) de los
 sub-scores disponibles (los `undefined`/`null` se excluyen automáticamente).
 No hay pesos adicionales que documentar aquí.
 
+#### C6 — Exclusión de `processingSpeed` del composite cognición
+
+**Decisión (C6, 2026-06-20):** `processingSpeed` fue excluida de los inputs de
+`cognition` en `computeComposite`.
+
+**Razón:** `processingSpeed` es una función lineal directa de `meanRt` de Signal Surge
+(`processingSpeed = clamp(round((1 − (meanRt − 200) / 700) × 100))`). Al mismo tiempo,
+`sustainedAttention` ya incorpora `meanRt` como uno de sus tres componentes con un peso
+de 25/100 (`rtScore × SIGNAL_RT_WEIGHT`). Incluir ambas métricas en la media aritmética
+de cognición significaría contar la varianza de `meanRt` dos veces (un candidato rápido
+recibiría un doble beneficio; uno lento, una doble penalización).
+
+**Opción elegida:** (a) excluir `processingSpeed`, mantener `sustainedAttention`.
+`sustainedAttention` es el composite más informativo de los dos porque integra señal
+de detección (hitRate), inhibición de respuesta (falseAlarmRate) **y** velocidad (RT).
+`processingSpeed` aporta solo la dimensión RT que ya está presente, sin añadir
+varianza independiente. Excluirla es la opción más simple y psicométricamente honesta.
+
+**Inputs de cognition tras C6:**
+- `executiveControl` (Switchboard)
+- `sustainedAttention` (Signal Surge — integra RT)
+- `workingMemory` (Memory Surge)
+- `fluidReasoning` (Raven Matrices)
+
+**Impacto en el baseline:** el fixture de regresión con `behavioral only` (sin eventos
+de signal) no cambia (processingSpeed era `undefined` y ya quedaba excluida por
+`meanDefined`). El cambio es efectivo para candidatos con eventos de Signal Surge:
+antes cognición recibía `sustainedAttention` **y** `processingSpeed`; ahora solo recibe
+`sustainedAttention`. El nuevo test C6 de canal único verifica este comportamiento.
+
 ---
 
 ## §4 Métricas de los juegos
@@ -333,9 +363,80 @@ Derivación:
 
 | Variable | Valor fijado |
 |---|---|
-| `cognition` | 95 (≈ solo executiveControl disponible) |
+| `cognition` | 95 (solo executiveControl disponible; processingSpeed excluida desde C6) |
 | `strategy` | 70.5 (media de 68 y 73) |
 | `riskCalibrated` | 80.8 (riskCalibration(83): dist=8, 100−8×2.4=80.8) |
+
+El baseline de `cognition = 95` no cambia con C6 porque en este fixture no hay
+signal events → `processingSpeed` era `undefined` antes y después de C6. El
+cambio de C6 es efectivo para candidatos con eventos Signal Surge (ver Suite D en
+`scoring.regression.test.ts`).
+
+### Fixture C6 — canal único de RT en cognición
+
+Dos candidatos idénticos excepto por el RT de sus hits en Signal Surge:
+- **FAST** (rt=300 ms, 4 hits + 2 misses/fase, 0 FA): sustainedAttention=80, processingSpeed=86
+- **SLOW** (rt=700 ms, misma estructura): sustainedAttention=65, processingSpeed=29
+- executiveControl=80 en ambos.
+
+Derivación FAST (rt=300 ms):
+- hitRate = 12/18 = 2/3; faRate = 0; decayIndex = 0 (hitRate igual en las 3 fases)
+- rtScore = clamp(1 − (300−200)/700) = 6/7 ≈ 0.857; rtComponent = 0.857×25 ≈ 21.43
+- rawComposite = (2/3)×50 + 25 + 21.43 = 79.76; maxPossible = 100
+- sustainedAttention = round(79.76×1.0) = 80
+- processingSpeed = round((6/7)×100) = round(85.71) = 86
+
+Derivación SLOW (rt=700 ms):
+- rtScore = clamp(1 − 500/700) = 2/7 ≈ 0.286; rtComponent ≈ 7.14
+- rawComposite = 33.33 + 25 + 7.14 = 65.47
+- sustainedAttention = round(65.47) = 65
+- processingSpeed = round((2/7)×100) = round(28.57) = 29
+
+Baseline cognición (tras C6):
+- cognition_FAST = meanDefined([80, 80]) = 80
+- cognition_SLOW = meanDefined([80, 65]) = 72.5
+- delta = 7.5 (un solo canal RT)
+
+Si processingSpeed siguiera en el composite (pre-C6):
+- cognition_FAST = (80+80+86)/3 ≈ 82; cognition_SLOW = (80+65+29)/3 ≈ 58; delta = 24
+
+---
+
+## §4 Big Five — mapeo de escala y lectura correcta (C7)
+
+**Versión:** añadido en C7 (2026-06-20).
+
+### §4.0 Mapeo suma → 0–100
+
+`calculateBigFive` en `src/lib/assessment.ts` suma 10 ítems Likert 1–5 por dominio,
+aplicando keying inverso a los ítems negativos:
+
+```
+suma = Σ effective_i,    effective_i = rawValue_i  (ítem directo)
+                                     = 6 − rawValue_i  (ítem inverso)
+
+score_0_100 = round((suma − min_posible) / (max_posible − min_posible) × 100)
+
+Con los 10 ítems completos: min=10, max=50 → score = round((suma − 10) / 40 × 100)
+Con n ítems respondidos (parcial): min=n, max=5n → score = round((suma − n) / (4n) × 100)
+```
+
+No hay clamps adicionales: la aritmética produce 0–100 naturalmente para cualquier
+suma válida en el rango.
+
+### §4.1 Qué significa el 0–100
+
+**El 0–100 del Big Five es la posición en el rango teórico del instrumento, NO un
+percentil ni una comparación normada.**
+
+- Un "64 en Apertura" significa que la persona respondió en promedio a los ítems de
+  apertura con valores equivalentes al 64 % del recorrido de la escala (de mínimo a máximo).
+- **No** significa "mejor que el 64 % de la población" ni "percentil 64".
+- Para afirmar un percentil se necesita una muestra normativa (N ≥ 200); con el pool
+  actual la comparación solo es relativa al propio grupo, y ese relativismo ya se
+  comunica explícitamente en la UI con `percentileBand` y el aviso de pool pequeño.
+
+La UI lo comunica explícitamente en `BigFiveReport` (C7, `src/App.tsx`).
 
 ---
 

@@ -126,6 +126,25 @@ export function calculateBehavioral(events: GameEvent[]): BehavioralScores {
 // Puntúa el Big Five (IPIP-50): aplica keying inverso, suma por dominio (10–50),
 // normaliza a 0–100, y calcula un índice de inconsistencia (respuesta incoherente).
 //
+// C7 — Mapeo lineal y clamps (docs/SCORING.md §4, actualizado en C7):
+//   Cada dominio tiene 10 ítems en escala Likert 1–5.
+//   Rango de suma con todos los ítems respondidos: mín = 10×1 = 10, máx = 10×5 = 50.
+//   Normalización: score_0_100 = round((suma − 10) / (50 − 10) × 100)
+//                              = round((suma − 10) / 40 × 100)
+//   Resultado: 0 cuando suma=10 (todos los ítems al mínimo), 100 cuando suma=50.
+//   INTERPRETACIÓN: este 0–100 es la POSICIÓN EN EL RANGO TEÓRICO DE LA ESCALA
+//   del instrumento, NO un percentil poblacional. Un "64" no significa "mejor que
+//   el 64 % de la población"; significa que la persona marcó valores equivalentes
+//   al 64 % del recorrido posible de la escala. La UI lo comunica explícitamente
+//   (C7, BigFiveReport). Sin normas poblacionales, no hay base para hablar de percentiles.
+//
+//   Con ítems parciales, la normalización usa el rango real del subconjunto respondido:
+//   mín = respondedCount × 1, máx = respondedCount × 5.
+//   El dominio se marca en partialDomains para que el consumidor lo trate con precaución.
+//
+//   No hay clamps adicionales: la aritmética produce siempre 0–100 exacto (o 50 si
+//   sin respuestas, como valor de posición neutral documentado).
+//
 // C3 — Ítems faltantes: ya NO se imputan a 3 (neutral) en silencio.
 // Si algún ítem de un dominio no tiene respuesta, el dominio se incluye en
 // `partialDomains`. El score del dominio se calcula solo con los ítems respondidos
