@@ -402,11 +402,11 @@ Si processingSpeed siguiera en el composite (pre-C6):
 
 ---
 
-## §4 Big Five — mapeo de escala y lectura correcta (C7)
+## §9 Big Five — mapeo de escala y lectura correcta (C7)
 
-**Versión:** añadido en C7 (2026-06-20).
+**Versión:** añadido en C7 (2026-06-20). Renumerado de §4 a §9 en revisión P2 para eliminar colisión con §4 Métricas de los juegos.
 
-### §4.0 Mapeo suma → 0–100
+### §9.0 Mapeo suma → 0–100
 
 `calculateBigFive` en `src/lib/assessment.ts` suma 10 ítems Likert 1–5 por dominio,
 aplicando keying inverso a los ítems negativos:
@@ -424,7 +424,7 @@ Con n ítems respondidos (parcial): min=n, max=5n → score = round((suma − n)
 No hay clamps adicionales: la aritmética produce 0–100 naturalmente para cualquier
 suma válida en el rango.
 
-### §4.1 Qué significa el 0–100
+### §9.1 Qué significa el 0–100
 
 **El 0–100 del Big Five es la posición en el rango teórico del instrumento, NO un
 percentil ni una comparación normada.**
@@ -436,7 +436,8 @@ percentil ni una comparación normada.**
   actual la comparación solo es relativa al propio grupo, y ese relativismo ya se
   comunica explícitamente en la UI con `percentileBand` y el aviso de pool pequeño.
 
-La UI lo comunica explícitamente en `BigFiveReport` (C7, `src/App.tsx`).
+La UI lo comunica explícitamente en `BigFiveReport` (C7, `src/App.tsx`); el PDF descargable
+incluye la misma nota (revisión P2).
 
 ---
 

@@ -126,7 +126,7 @@ export function calculateBehavioral(events: GameEvent[]): BehavioralScores {
 // Puntúa el Big Five (IPIP-50): aplica keying inverso, suma por dominio (10–50),
 // normaliza a 0–100, y calcula un índice de inconsistencia (respuesta incoherente).
 //
-// C7 — Mapeo lineal y clamps (docs/SCORING.md §4, actualizado en C7):
+// C7 — Mapeo lineal y clamps (docs/SCORING.md §9, actualizado en C7):
 //   Cada dominio tiene 10 ítems en escala Likert 1–5.
 //   Rango de suma con todos los ítems respondidos: mín = 10×1 = 10, máx = 10×5 = 50.
 //   Normalización: score_0_100 = round((suma − 10) / (50 − 10) × 100)

@@ -1062,9 +1062,12 @@ function BigFiveReport({
       )}
       {/* C7 — aclaración de escala: 0–100 es posición en el rango teórico del instrumento,
           NO un percentil poblacional ni una comparación normada.
-          Mapeo: suma de ítems 10–50 → 0–100 lineal. Ver docs/SCORING.md §4 (C7). */}
+          Mapeo: suma de ítems 10–50 → 0–100 lineal. Ver docs/SCORING.md §9 (C7).
+          IMP-2 (P2): variante técnica para admin. */}
       <p className="bf-partial-legend">
-        Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales.
+        {audience === "admin"
+          ? "Los valores 0–100 son posición en el rango teórico del instrumento, no percentil poblacional; ver SCORING.md §9."
+          : "Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales."}
       </p>
       {result.inconsistency > 60 && audience === "admin" && (
         <p className="bf-inconsistency">⚠ Índice de inconsistencia alto ({result.inconsistency}/100): posibles respuestas incoherentes o poco cuidadosas. Interpretar con cautela.</p>
@@ -1833,7 +1836,7 @@ function candidateReportHtml(candidate: Candidate) {
     <p class="tag">Reporte · ${escHtml(APP_NAME)}</p>
     <h1>${safeName}</h1>
     <p>${new Date().toLocaleDateString("es-PE")}</p>
-    ${p ? `<h2>Perfil de personalidad (Big Five)</h2><p style="font-size:13px;color:#5a6b63">Estilo personal — no hay valores buenos o malos.</p>${pdfBars(bfRows)}` : ""}
+    ${p ? `<h2>Perfil de personalidad (Big Five)</h2><p style="font-size:13px;color:#5a6b63">Estilo personal — no hay valores buenos o malos.</p>${pdfBars(bfRows)}<p style="font-size:11px;color:#5a6b63;margin-top:6px">Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales.</p>` : ""}
     ${b ? `<h2>Desempeño conductual</h2>${pdfBars(bhRows)}` : ""}
     <p class="note">Resultado orientativo. No es diagnóstico psicológico ni debe usarse como decisión única de selección.</p>
   </main></body></html>`;
