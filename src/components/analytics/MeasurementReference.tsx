@@ -6,8 +6,10 @@
 import { useEffect, useRef } from "react";
 import { assessmentCatalog } from "../../data/assessmentCatalog";
 import { bigFiveDomains } from "../../data/bigfive";
+import { ReliabilitySection } from "./ReliabilitySection";
+import type { Candidate } from "../../types";
 
-export function MeasurementReference({ onClose }: { onClose: () => void }) {
+export function MeasurementReference({ onClose, candidates }: { onClose: () => void; candidates: Candidate[] }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -84,6 +86,8 @@ export function MeasurementReference({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="measref-caution">⚠ Nota de cautela: estos resultados describen estilo y desempeño en condiciones de prueba. No deben usarse como criterio único de selección ni interpretarse como diagnóstico. Su valor predictivo solo puede afirmarse tras un estudio de validación con datos reales de desempeño.</p>
+
+        <ReliabilitySection candidates={candidates} />
       </div>
     </div>
   );

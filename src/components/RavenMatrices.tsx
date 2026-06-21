@@ -1,5 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { AURORA } from "../utils/palette";
+import { RAVEN_BANK } from "../data/ravenBank";
+import type { Cell, RavenItem } from "../data/ravenBank";
 import "./RavenMatrices.css";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -17,15 +19,18 @@ export type RavenMatricesProps = {
 };
 
 type ShapeId = "circle" | "square" | "triangle" | "diamond";
-interface Cell { shape: ShapeId; count: number; color: string; rotation: number }
-interface Item { grid: Cell[]; options: Cell[]; answer: number; }
 
 const SHAPES: ShapeId[] = ["circle", "square", "triangle", "diamond"];
 const COLORS = [AURORA.signal, AURORA.amber, AURORA.blue];
 const ROTATIONS = [0, 45, 90];
 
-const REAL_ITEMS = 6;
-const PRACTICE_ITEMS = 2;
+// ─── Generación de ítems de práctica (aleatoria — no afecta comparabilidad) ─
+// La práctica es orientativa y no se guarda en el historial del candidato.
+// Solo la ruta real usa RAVEN_BANK.
+
+function cellEq(a: Cell, b: Cell) {
+  return a.shape === b.shape && a.count === b.count && a.color === b.color && a.rotation === b.rotation;
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -36,37 +41,29 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 function sample<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
-function cellEq(a: Cell, b: Cell) { return a.shape === b.shape && a.count === b.count && a.color === b.color && a.rotation === b.rotation; }
 
-// Genera una matriz 3x3 válida con dificultad creciente.
-function genItem(difficulty: number): Item {
-  const shapesByRow = shuffle(SHAPES).slice(0, 3);          // forma varía por fila
-  const colorVariesByCol = difficulty >= 1;
-  const rotVariesByRow = difficulty >= 2;
+function genPracticeItem(): RavenItem {
+  // Versión simplificada (dificultad 0) para práctica — igual que la original.
+  const shapesByRow = shuffle(SHAPES).slice(0, 3);
   const baseColor = sample(COLORS);
-  const colsColors = colorVariesByCol ? shuffle(COLORS) : [baseColor, baseColor, baseColor];
+  const colsColors = [baseColor, baseColor, baseColor];
   const baseRot = sample(ROTATIONS);
-  const rowRot = rotVariesByRow ? shuffle(ROTATIONS) : [baseRot, baseRot, baseRot];
-
-  // C-3 — la celda faltante es siempre (2,2); si count = c+1 la respuesta correcta
-  // tendría SIEMPRE 3 figuras, un atajo que evita el razonamiento. Usamos un offset
-  // cíclico por ítem: la regla "+1 por columna (cíclico)" sigue siendo inferible de
-  // las filas completas, pero la cantidad correcta varía entre 1, 2 y 3.
+  const rowRot = [baseRot, baseRot, baseRot];
   const countOffset = Math.floor(Math.random() * 3);
-  const cell = (r: number, c: number): Cell => ({
+
+  const cell = (r: number, co: number): Cell => ({
     shape: shapesByRow[r],
-    count: ((c + countOffset) % 3) + 1,   // progresión cíclica por columna
-    color: colsColors[c],
+    count: ((co + countOffset) % 3) + 1,
+    color: colsColors[co],
     rotation: rowRot[r],
   });
 
   const grid: Cell[] = [];
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) grid.push(cell(r, c));
-  const correct = grid[8]; // la celda faltante es (2,2)
+  for (let r = 0; r < 3; r++) for (let co = 0; co < 3; co++) grid.push(cell(r, co));
+  const correct = grid[8];
 
-  // Distractores: perturbar un atributo a la vez
   const distractors: Cell[] = [];
-  const tries = [
+  const tries: Cell[] = [
     { ...correct, count: ((correct.count) % 3) + 1 },
     { ...correct, shape: sample(SHAPES.filter((s) => s !== correct.shape)) },
     { ...correct, color: sample(COLORS.filter((c) => c !== correct.color)) },
@@ -77,9 +74,6 @@ function genItem(difficulty: number): Item {
     if (!cellEq(t, correct) && !distractors.some((d) => cellEq(d, t))) distractors.push(t);
     if (distractors.length >= 5) break;
   }
-  // M2 — add an iteration cap; if the random search hasn't found 5 unique
-  //      distractors within MAX_ATTEMPTS, fall through with however many we have
-  //      (the tries[] block above guarantees at least 3–4 in practice).
   const MAX_ATTEMPTS = 120;
   let attempts = 0;
   while (distractors.length < 5 && attempts < MAX_ATTEMPTS) {
@@ -91,6 +85,10 @@ function genItem(difficulty: number): Item {
   const options = shuffle([correct, ...distractors]);
   return { grid: grid.slice(0, 8), options, answer: options.findIndex((o) => cellEq(o, correct)) };
 }
+
+const PRACTICE_ITEMS = 2;
+// La prueba real usa el banco fijo completo.
+const REAL_ITEMS = RAVEN_BANK.length;
 
 // ─── Render de figuras (SVG) ───────────────────────────────────────────────────
 
@@ -165,7 +163,16 @@ const Results: React.FC<{ result: RavenResult; onContinue: () => void }> = ({ re
 const RavenMatrices: React.FC<RavenMatricesProps> = ({ practice = false, onComplete, onContinue }) => {
   type Screen = "intro" | "playing" | "results";
   const total = practice ? PRACTICE_ITEMS : REAL_ITEMS;
-  const items = useMemo(() => Array.from({ length: total }, (_, i) => genItem(practice ? 0 : Math.min(2, Math.floor(i / 2)))), [total, practice]);
+
+  // Ruta real: banco fijo determinista (sin Math.random).
+  // Ruta práctica: ítems generados aleatoriamente (no afecta comparabilidad).
+  const items = useMemo<RavenItem[]>(() => {
+    if (practice) {
+      return Array.from({ length: PRACTICE_ITEMS }, () => genPracticeItem());
+    }
+    // Banco fijo: mismos ítems, mismo orden, para todos los candidatos.
+    return [...RAVEN_BANK];
+  }, [practice]);
 
   const [screen, setScreen] = useState<Screen>("intro");
   const [index, setIndex] = useState(0);

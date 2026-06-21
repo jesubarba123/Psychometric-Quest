@@ -42,19 +42,23 @@ export type SignalSurgeMetrics = {
   falseAlarmsByPhase: number[];
   dPrime: number;
   impulsivityLabel: "low" | "moderate" | "high";
-  meanRt: number;
-  medianRt: number;
-  rtP25: number;
-  rtP75: number;
-  rtStdDev: number;
-  cvRt: number;
-  consistencyLabel: "consistent" | "moderate" | "variable";
+  /** null cuando no hubo hits — excluir del cálculo en vez de inventar un 0
+   *  que inflaría rtScore (CRIT-1: bug inverso al placeholder 999 de C3). */
+  meanRt: number | null;
+  /** null cuando no hubo hits. */
+  medianRt: number | null;
+  rtP25: number | null;
+  rtP75: number | null;
+  rtStdDev: number | null;
+  cvRt: number | null;
+  consistencyLabel: "consistent" | "moderate" | "variable" | "n/a";
   rtOutliers: number[];
   metricsByPhase: Array<{
     phase: number;
     hitRate: number;
     faRate: number;
-    meanRt: number;
+    /** null cuando no hubo hits en esa fase. */
+    meanRt: number | null;
   }>;
   rtBuckets: Array<{ bucket: string; count: number; phase: number }>;
 };
@@ -65,8 +69,10 @@ export type CandidateProfile = {
   completedAt: Date;
   radarDimensions: {
     sustainedAttention: number;
-    processingSpeed: number;
-    cognitiveConsistency: number;
+    /** null cuando no hubo hits en Signal Surge (CRIT-1: excluir > inventar). */
+    processingSpeed: number | null;
+    /** null cuando no hubo hits en Signal Surge (sin RT no hay variabilidad). */
+    cognitiveConsistency: number | null;
     riskAppetite: number;
     lossResilience: number;
   };

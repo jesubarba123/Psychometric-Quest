@@ -15,7 +15,10 @@ export type MemorySurgeResult = {
   misses: number;
   falseAlarms: number;
   correctRejections: number;
-  meanRt: number;
+  /** Tiempo de reacción medio en ms. undefined cuando no hubo hits (IMP-4: eliminado
+   *  placeholder 0 que mostraba "0ms" y contaminaba el rtScore con 0.5 inventado).
+   *  Mismo principio C3 que SignalSurge: excluir el faltante > inventar un valor. */
+  meanRt: number | undefined;
   workingMemoryScore: number; // 0-100
 };
 
@@ -26,13 +29,26 @@ export type MemorySurgeProps = {
 };
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
+// ver docs/SCORING.md §4.3 para justificación de cada parámetro.
 
-const N_BACK = 2;
-const FULL_STEPS = 18;           // 16 puntuables (índices ≥ 2)
+const N_BACK = 2;                // distancia de comparación N-back; 2-back es estándar para MO
+const FULL_STEPS = 18;           // 16 puntuables (índices ≥ N_BACK)
 const PRACTICE_STEPS = 6;
-const MATCH_RATIO = 0.38;        // ~6 coincidencias
-const STEP_SHOW_MS = 1350;       // ventana de respuesta
-const STEP_GAP_MS = 480;
+const MATCH_RATIO = 0.38;        // proporción de ensayos que son coincidencia (~6/16); PROVISIONAL
+const STEP_SHOW_MS = 1350;       // ventana de respuesta en ms; PROVISIONAL — sin calibrar
+const STEP_GAP_MS = 480;         // pausa inter-estímulo en ms; PROVISIONAL — sin calibrar
+
+// ─── Constantes de scoring workingMemoryScore — ver docs/SCORING.md §4.3 ─────
+// Pesos del composite de memoria de trabajo (suma máx ≈ 100):
+//   hitRate  × WM_HIT_WEIGHT  +  (1-faRate) × WM_FA_WEIGHT  +  rtScore × WM_RT_WEIGHT
+// PROVISIONAL — sin calibrar (requiere datos)
+const WM_HIT_WEIGHT = 58;        // peso del hit-rate en el composite de memoria
+const WM_FA_WEIGHT = 30;         // peso del factor de falsas alarmas
+const WM_RT_WEIGHT = 12;         // peso del componente de RT
+// RT de referencia para rtScore = 1 - (meanRt - WM_RT_FLOOR) / WM_RT_RANGE.
+// PROVISIONAL — sin calibrar (requiere datos)
+const WM_RT_FLOOR_MS = 350;      // TR por debajo de este valor se considera perfecto
+const WM_RT_RANGE_MS = 900;      // rango de normalización de RT (ms)
 
 type Glyph = { sym: string; color: string; name: string };
 // Glifos distractores para N-back: 6 colores perceptualmente distintos, todos
@@ -67,17 +83,31 @@ function computeResult(events: MemoryEvent[]): MemorySurgeResult {
   const falseAlarms = events.filter(e => e.type === "false_alarm").length;
   const correctRejections = events.filter(e => e.type === "correct_reject").length;
   const rts = (events.filter(e => e.type === "hit") as Extract<MemoryEvent, { type: "hit" }>[]).map(e => e.rt);
-  const meanRt = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0;
+
+  // IMP-4 — meanRt es undefined cuando no hay hits, no 0.
+  // Un meanRt=0 era un placeholder inventado que mostraba "0ms" en la UI y hacía que
+  // rtScore=0.5 entrara al composite (valor neutro pero inventado).
+  // Mismo principio C3 que SignalSurge: excluir el componente RT > inventar un valor.
+  const meanRt: number | undefined = rts.length
+    ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length)
+    : undefined;
 
   const totalTargets = hits + misses;
   const totalNonTargets = falseAlarms + correctRejections;
   const hitRate = totalTargets ? hits / totalTargets : 0;
   const faRate = totalNonTargets ? falseAlarms / totalNonTargets : 0;
-  const rtScore = meanRt ? Math.max(0, 1 - (meanRt - 350) / 900) : 0.5;
-
-  const workingMemoryScore = Math.round(
-    Math.max(0, Math.min(100, hitRate * 58 + (1 - faRate) * 30 + rtScore * 12)),
-  );
+  // ver docs/SCORING.md §4.3 — WM_RT_FLOOR_MS, WM_RT_RANGE_MS
+  // IMP-4: rtScore es null cuando meanRt es undefined (sin hits). El componente RT
+  // se excluye del composite en lugar de usar 0.5 (placeholder eliminado).
+  const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - WM_RT_FLOOR_MS) / WM_RT_RANGE_MS) : null;
+  const rtComponent = rtScore !== null ? rtScore * WM_RT_WEIGHT : 0;
+  // Renormalizar por maxPossible cuando no hay RT (mismo principio que Signal Surge CRIT-1).
+  // Sin hits, rtComponent=0 y el máximo alcanzable es WM_HIT_WEIGHT + WM_FA_WEIGHT = 88.
+  // ver docs/SCORING.md §4.3 — WM_HIT_WEIGHT, WM_FA_WEIGHT, WM_RT_WEIGHT
+  const maxPossible = WM_HIT_WEIGHT + WM_FA_WEIGHT + (rtScore !== null ? WM_RT_WEIGHT : 0);
+  const workingMemoryScore = Math.max(0, Math.min(100, Math.round(
+    (hitRate * WM_HIT_WEIGHT + (1 - faRate) * WM_FA_WEIGHT + rtComponent) / maxPossible * 100,
+  )));
   return { hits, misses, falseAlarms, correctRejections, meanRt, workingMemoryScore };
 }
 
@@ -139,7 +169,14 @@ const Results: React.FC<{ result: MemorySurgeResult; onContinue: () => void }> =
         <div className="ms-stat-card"><span className="ms-stat-val ms-good">{result.hits}</span><span className="ms-stat-lbl">Aciertos</span></div>
         <div className="ms-stat-card"><span className="ms-stat-val ms-warn">{result.misses}</span><span className="ms-stat-lbl">Omisiones</span></div>
         <div className="ms-stat-card"><span className="ms-stat-val ms-warn">{result.falseAlarms}</span><span className="ms-stat-lbl">Falsas alarmas</span></div>
-        <div className="ms-stat-card"><span className="ms-stat-val">{result.meanRt}<span className="ms-stat-unit">ms</span></span><span className="ms-stat-lbl">TR medio</span></div>
+        <div className="ms-stat-card">
+          <span className="ms-stat-val">
+            {result.meanRt !== undefined
+              ? <>{result.meanRt}<span className="ms-stat-unit">ms</span></>
+              : <span className="ms-stat-na" aria-label="Sin datos de tiempo de reacción">—</span>}
+          </span>
+          <span className="ms-stat-lbl">TR medio</span>
+        </div>
       </div>
       <button className="ms-continue-btn" onClick={onContinue}>Continuar</button>
     </div>

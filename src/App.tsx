@@ -11,12 +11,15 @@ import RavenMatrices, { type RavenResult } from "./components/RavenMatrices";
 import { CandidateScatter3D } from "./components/analytics/CandidateScatter3D";
 import { PsychometricDashboard } from "./components/analytics/PsychometricDashboard";
 import { MeasurementReference } from "./components/analytics/MeasurementReference";
+import { ReliabilitySection } from "./components/analytics/ReliabilitySection";
 import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, loadDatabase, recordCandidateAccess, upsertCandidate } from "./lib/storage";
 import { isAdminEmail, isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
 import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculations";
 import { computeComposite } from "./utils/compositeAxes";
 import { dataQuality, percentileInPool, percentileBand, cvAptitudeGap, positionFit, correlationMatrix, type DataQuality } from "./utils/insights";
 import { extractCvText } from "./utils/cvParse";
+import { ScoreBand } from "./components/ScoreBand";
+import type { DomainReliability } from "./utils/reliability";
 import type { Candidate, CandidateOutcome, CvMatchResult, EnglishLevel, GameEvent, HiringDecision, JobPosition, Role } from "./types";
 
 const APP_NAME = "Psychometric Quest";
@@ -961,7 +964,9 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
   function goNext() {
     if (isLast) {
       const personality = calculateBigFive(answers);
-      const surveyEvent = gameEvent("survey_result", { ...personality.domains, inconsistency: personality.inconsistency });
+      // MED-3 — incluir partialDomains en el evento para que quede en el log
+      //         y permita re-derivar el estado de completitud desde los eventos crudos.
+      const surveyEvent = gameEvent("survey_result", { ...personality.domains, inconsistency: personality.inconsistency, partialDomains: personality.partialDomains });
       // C-1: re-tomar no debe duplicar el survey_result; reemplazamos el previo si existe.
       const kept = (candidate.events ?? []).filter((event) => event.type !== "survey_result");
       onComplete({ ...candidate, personality, surveyAnswers: answers, events: [...kept, surveyEvent] });
@@ -1028,24 +1033,56 @@ function Survey({ candidate, onComplete, onBack }: { candidate: Candidate; onCom
   );
 }
 
-// Reporte de personalidad Big Five (5 dominios), lenguaje no evaluativo
-function BigFiveReport({ result, audience }: { result: import("./types").BigFiveResult; audience: "candidate" | "admin" }) {
+// Reporte de personalidad Big Five (5 dominios), lenguaje no evaluativo.
+// C4 — el número y la barra .bf-bar se reemplazan por ScoreBand con banda de incertidumbre.
+// domainReliability: cuando se pasa (vista admin), ScoreBand usa interpretable del pool.
+//                    Cuando no se pasa (vista candidato), interpretable queda undefined
+//                    (ScoreBand muestra banda con sem_proxy=10 por defecto).
+function BigFiveReport({
+  result,
+  audience,
+  domainReliability,
+}: {
+  result: import("./types").BigFiveResult;
+  audience: "candidate" | "admin";
+  domainReliability?: Record<BigFiveDomainKey, DomainReliability>;
+}) {
+  const hasPartial = result.partialDomains && result.partialDomains.length > 0;
   return (
     <div className="bigfive-report">
       {bigFiveDomains.map((domain) => {
         const value = result.domains[domain.key];
+        // IMP-2 — dominio con ítems sin responder: mostrar superíndice * en el score
+        const isPartial = result.partialDomains?.includes(domain.key) ?? false;
         const tendency = value >= 60 ? domain.highLabel : value <= 40 ? domain.lowLabel : "En un punto intermedio entre ambos extremos.";
+        const interpretable = domainReliability?.[domain.key].interpretable;
         return (
           <div className="bf-domain" key={domain.key}>
-            <div className="bf-domain-head">
-              <strong>{domain.name}</strong>
-              <span className="bf-domain-score" style={{ color: domain.color }}>{value}</span>
-            </div>
-            <div className="bf-bar"><i style={{ width: `${value}%`, background: domain.color }} /></div>
+            {/* C4 — ScoreBand reemplaza bf-domain-head + .bf-bar + número.
+                El label se pasa para el aria-label; se muestra en la primera columna del grid. */}
+            <ScoreBand
+              label={domain.name}
+              value={value}
+              interpretable={interpretable}
+              isPartial={isPartial}
+            />
             <p className="bf-domain-desc">{audience === "candidate" ? `Tiendes a: ${tendency.toLowerCase()}` : tendency}</p>
           </div>
         );
       })}
+      {/* IMP-2 — leyenda del superíndice * solo si hay dominios parciales */}
+      {hasPartial && (
+        <p className="bf-partial-legend">* Dominio con ítems sin responder: interpretar con precaución.</p>
+      )}
+      {/* C7 — aclaración de escala: 0–100 es posición en el rango teórico del instrumento,
+          NO un percentil poblacional ni una comparación normada.
+          Mapeo: suma de ítems 10–50 → 0–100 lineal. Ver docs/SCORING.md §9 (C7).
+          IMP-2 (P2): variante técnica para admin. */}
+      <p className="bf-partial-legend">
+        {audience === "admin"
+          ? "Los valores 0–100 son posición en el rango teórico del instrumento, no percentil poblacional; ver SCORING.md §9."
+          : "Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales."}
+      </p>
       {result.inconsistency > 60 && audience === "admin" && (
         <p className="bf-inconsistency">⚠ Índice de inconsistencia alto ({result.inconsistency}/100): posibles respuestas incoherentes o poco cuidadosas. Interpretar con cautela.</p>
       )}
@@ -1098,14 +1135,17 @@ function CandidateReport({ candidate }: { candidate: Candidate }) {
         {candidate.behavioral && (
           <div className="panel">
             <h2>Detalle conductual</h2>
+            {/* C4 — ScoreRow reemplazado por ScoreBand con banda de incertidumbre.
+                interpretable no se pasa (omitido): muestra banda con sem_proxy=10.
+                Cuando C5 entregue SEM real, añadir sem={semValue} e interpretable={bool}. */}
             <div className="score-list">
-              <ScoreRow label="Adaptabilidad" value={candidate.behavioral.adaptability} />
-              <ScoreRow label="Priorización" value={candidate.behavioral.prioritization} />
-              <ScoreRow label="Control ejecutivo" value={candidate.behavioral.executiveControl} />
-              <ScoreRow label="Riesgo calculado" value={candidate.behavioral.calculatedRisk} />
-              {typeof candidate.behavioral.sustainedAttention === "number" && <ScoreRow label="Atención sostenida" value={candidate.behavioral.sustainedAttention} />}
-              {typeof candidate.behavioral.workingMemory === "number" && <ScoreRow label="Memoria de trabajo" value={candidate.behavioral.workingMemory} />}
-              {typeof candidate.behavioral.fluidReasoning === "number" && <ScoreRow label="Razonamiento fluido" value={candidate.behavioral.fluidReasoning} />}
+              <ScoreBand label="Adaptabilidad" value={candidate.behavioral.adaptability} />
+              <ScoreBand label="Priorización" value={candidate.behavioral.prioritization} />
+              <ScoreBand label="Control ejecutivo" value={candidate.behavioral.executiveControl} />
+              <ScoreBand label="Riesgo calculado" value={candidate.behavioral.calculatedRisk} />
+              {typeof candidate.behavioral.sustainedAttention === "number" && <ScoreBand label="Atención sostenida" value={candidate.behavioral.sustainedAttention} />}
+              {typeof candidate.behavioral.workingMemory === "number" && <ScoreBand label="Memoria de trabajo" value={candidate.behavioral.workingMemory} />}
+              {typeof candidate.behavioral.fluidReasoning === "number" && <ScoreBand label="Razonamiento fluido" value={candidate.behavioral.fluidReasoning} />}
             </div>
             <p className="profile-note"><strong>{candidate.behavioral.profile}</strong> resume el patrón observado durante los juegos conductuales. Es una <strong>etiqueta descriptiva</strong>, no un diagnóstico ni un criterio de selección.</p>
           </div>
@@ -1431,7 +1471,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <section className="workbench">
-      {showMeasRef && <MeasurementReference onClose={() => setShowMeasRef(false)} />}
+      {showMeasRef && <MeasurementReference onClose={() => setShowMeasRef(false)} candidates={db.candidates} />}
       <div className="section-head">
         <div>
           <p className="eyebrow">Administrador</p>
@@ -1681,6 +1721,7 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
           <div className="domain-bars">
             {bigFiveAverages.map((item) => <Bar key={item.key} label={item.name} value={item.avg} />)}
           </div>
+          <ReliabilitySection candidates={db.candidates} />
         </div>
       </div>
       <div className="panel">
@@ -1809,7 +1850,7 @@ function candidateReportHtml(candidate: Candidate) {
     <p class="tag">Reporte · ${escHtml(APP_NAME)}</p>
     <h1>${safeName}</h1>
     <p>${new Date().toLocaleDateString("es-PE")}</p>
-    ${p ? `<h2>Perfil de personalidad (Big Five)</h2><p style="font-size:13px;color:#5a6b63">Estilo personal — no hay valores buenos o malos.</p>${pdfBars(bfRows)}` : ""}
+    ${p ? `<h2>Perfil de personalidad (Big Five)</h2><p style="font-size:13px;color:#5a6b63">Estilo personal — no hay valores buenos o malos.</p>${pdfBars(bfRows)}<p style="font-size:11px;color:#5a6b63;margin-top:6px">Los valores 0–100 indican la posición en el rango teórico de la escala, no un percentil ni una comparación con normas poblacionales.</p>` : ""}
     ${b ? `<h2>Desempeño conductual</h2>${pdfBars(bhRows)}` : ""}
     <p class="note">Resultado orientativo. No es diagnóstico psicológico ni debe usarse como decisión única de selección.</p>
   </main></body></html>`;

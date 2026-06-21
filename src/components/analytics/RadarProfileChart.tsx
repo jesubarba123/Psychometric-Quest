@@ -6,6 +6,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import type { TooltipContentProps, TooltipValueType } from "recharts";
 import type { CandidateProfile } from "../../psychometrics/types";
 import { AURORA, STRUCTURE } from "../../utils/palette";
 
@@ -17,7 +18,7 @@ const DIMENSION_LABELS: Record<keyof CandidateProfile["radarDimensions"], string
   lossResilience: "Resiliencia",
 };
 
-const BENCHMARK: CandidateProfile["radarDimensions"] = {
+const BENCHMARK: Record<keyof CandidateProfile["radarDimensions"], number> = {
   sustainedAttention: 65,
   processingSpeed: 58,
   cognitiveConsistency: 60,
@@ -25,15 +26,64 @@ const BENCHMARK: CandidateProfile["radarDimensions"] = {
   lossResilience: 55,
 };
 
+type RadarDataPoint = {
+  dimension: string;
+  /** Valor numérico para dibujar el polígono; 0 cuando candidateNull=true. */
+  candidate: number;
+  /** true cuando la dimensión no tiene dato real (el candidato no tuvo hits). */
+  candidateNull: boolean;
+  benchmark: number;
+};
+
 type Props = {
   profile: CandidateProfile;
 };
 
+// Tooltip personalizado para mostrar "sin dato" cuando candidateNull=true.
+// NUEVO-IMP-1: el formatter estándar de Recharts no tiene acceso al payload completo
+// por entrada, así que usamos un componente de tooltip a medida.
+function RadarTooltip({ active, payload }: TooltipContentProps<TooltipValueType, number | string>) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div
+      style={{
+        background: STRUCTURE.surface,
+        border: `1px solid ${STRUCTURE.line}`,
+        borderRadius: 8,
+        color: STRUCTURE.ink,
+        fontSize: 12,
+        padding: "8px 12px",
+      }}
+    >
+      {payload.map((entry) => {
+        // entry.payload es el objeto RadarDataPoint del punto activo
+        const point = entry.payload as RadarDataPoint;
+        const isCandidate = entry.dataKey === "candidate";
+        const displayValue =
+          isCandidate && point.candidateNull
+            ? "sin dato"
+            : `${entry.value}/100`;
+        return (
+          <div key={String(entry.dataKey)} style={{ color: entry.color }}>
+            {entry.name}: {displayValue}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function RadarProfileChart({ profile }: Props) {
-  const data = Object.entries(profile.radarDimensions).map(([key, value]) => ({
-    dimension: DIMENSION_LABELS[key as keyof CandidateProfile["radarDimensions"]],
-    candidate: value,
-    benchmark: BENCHMARK[key as keyof CandidateProfile["radarDimensions"]],
+  const data: RadarDataPoint[] = (
+    Object.entries(profile.radarDimensions) as [keyof CandidateProfile["radarDimensions"], number | null][]
+  ).map(([key, value]) => ({
+    dimension: DIMENSION_LABELS[key],
+    // NUEVO-IMP-1: el polígono usa 0 para poder dibujarse cuando value es null,
+    // pero candidateNull=true indica al tooltip que debe decir "sin dato" en vez de "0/100".
+    candidate: value ?? 0,
+    candidateNull: value === null,
+    benchmark: BENCHMARK[key],
   }));
 
   return (
@@ -56,16 +106,7 @@ export function RadarProfileChart({ profile }: Props) {
             fill="rgba(78,205,196,.18)"
             strokeWidth={2}
           />
-          <Tooltip
-            contentStyle={{
-              background: STRUCTURE.surface,
-              border: `1px solid ${STRUCTURE.line}`,
-              borderRadius: 8,
-              color: STRUCTURE.ink,
-              fontSize: 12,
-            }}
-            formatter={(value, name) => [`${value}/100`, name]}
-          />
+          <Tooltip content={RadarTooltip} />
         </RadarChart>
       </ResponsiveContainer>
     </div>

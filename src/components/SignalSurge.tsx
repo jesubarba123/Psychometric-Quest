@@ -12,7 +12,9 @@ export type SignalSurgeResult = {
   hits: number;
   misses: number;
   falseAlarms: number;
-  meanRt: number;
+  /** Tiempo de reacción medio en ms. undefined cuando no hubo hits (C3: eliminado
+   *  placeholder 999 que contaminaba rtScore y los agregados de atención). */
+  meanRt: number | undefined;
   rtVariability: number;   // std-dev of reaction times — measure of consistency
   decayIndex: number;      // performance drop from phase 1→3, 0–1
   attentionScore: number;  // composite 0–100
@@ -25,17 +27,34 @@ export type SignalSurgeProps = {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// ver docs/SCORING.md §4.2 para justificación de cada parámetro.
 
 const FULL_PHASES = 3;
 const PRACTICE_PHASES = 1;
 const TRIALS_PER_PHASE = 10;          // 30 total trials
 const TARGET_RATIO = 0.4;             // 40 % of trials are targets
-const SIGNAL_DURATION_MS = [900, 700, 550]; // gets harder per phase
-const ISI_MIN = 800;                  // inter-stimulus interval min
-const ISI_MAX = 2000;
+const SIGNAL_DURATION_MS = [900, 700, 550]; // ventana de señal por fase (ms); PROVISIONAL
+const ISI_MIN = 800;                  // inter-stimulus interval min (ms)
+const ISI_MAX = 2000;                 // inter-stimulus interval max (ms)
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
 const TOTAL_CELLS = GRID_COLS * GRID_ROWS;
+
+// ─── Constantes de scoring attentionScore — ver docs/SCORING.md §4.2 ──────────
+// Pesos del composite de atención sostenida en SignalSurge.tsx.
+// Nota: psychometricCalculations.ts usa constantes paralelas para el mismo
+// cálculo sobre los eventos crudos. Los valores deben mantenerse sincronizados.
+// PROVISIONAL — sin calibrar (requiere datos)
+const SS_HIT_RATE_WEIGHT = 50;  // peso del hit-rate en el composite de atención
+const SS_FA_WEIGHT = 25;        // peso del componente de falsas alarmas
+const SS_RT_WEIGHT = 25;        // peso del componente de RT (omitido si meanRt=undefined)
+const SS_FA_SCALE = 5;          // escala de penalización de FA: min(faRate * SS_FA_SCALE, 1)
+const SS_DECAY_FACTOR = 0.2;    // fracción de decayIndex que penaliza el composite
+// RT de referencia para rtScore = max(0, 1 - (meanRt - SS_RT_FLOOR_MS) / SS_RT_RANGE_MS).
+// Sincronizado con RT_FLOOR_MS / RT_RANGE_MS de psychometricCalculations.ts.
+// PROVISIONAL — sin calibrar (requiere datos)
+const SS_RT_FLOOR_MS = 200;     // TR por debajo de este valor produce rtScore=1
+const SS_RT_RANGE_MS = 700;     // rango de normalización de RT (ms)
 
 // Symbols: targets are the filled triangle (▲), distractors are the rest
 const TARGET_SYMBOL = "▲";
@@ -47,13 +66,19 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
 }
 
-function computeResult(events: SignalEvent[]): SignalSurgeResult {
+// C3 — computeResult es exportada para permitir tests unitarios sin instanciar el componente.
+export function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const hits = events.filter(e => e.type === "hit").length;
   const misses = events.filter(e => e.type === "miss").length;
   const falseAlarms = events.filter(e => e.type === "false_alarm").length;
   const rts = (events.filter(e => e.type === "hit") as Extract<SignalEvent, { type: "hit" }>[]).map(e => e.rt);
 
-  const meanRt = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 999;
+  // C3 — meanRt es undefined cuando no hay hits, no 999.
+  // Un meanRt=999 era un placeholder inventado que entraba a rtScore y deformaba
+  // attentionScore. undefined indica "dato no disponible" y se excluye del cálculo.
+  const meanRt: number | undefined = rts.length
+    ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length)
+    : undefined;
   const rtVariability = Math.round(stdDev(rts));
 
   // decayIndex: compare hit rate in phase 1 vs phase 3
@@ -75,10 +100,23 @@ function computeResult(events: SignalEvent[]): SignalSurgeResult {
   const PHASES_PLAYED = Math.max(1, ...events.map(e => e.phase));
   const distractorTrials = Math.round(TRIALS_PER_PHASE * (1 - TARGET_RATIO)) * PHASES_PLAYED;
   const faRate = falseAlarms / Math.max(1, distractorTrials);
-  const rtScore = Math.max(0, 1 - (meanRt - 200) / 700);
-  const attentionScore = Math.round(
-    (hitRate * 50 + (1 - Math.min(faRate * 5, 1)) * 25 + rtScore * 25) * (1 - decayIndex * 0.2)
-  );
+  // C3 — rtScore solo se calcula cuando hay un meanRt real; sin hits no aporta al composite.
+  // Decisión: excluir el componente RT del composite cuando no hay datos de RT,
+  // redistribuyendo su peso implícitamente. ver docs/SCORING.md §4.2 — SS_RT_FLOOR_MS, SS_RT_RANGE_MS
+  const rtScore = meanRt !== undefined ? Math.max(0, 1 - (meanRt - SS_RT_FLOOR_MS) / SS_RT_RANGE_MS) : null;
+  const rtComponent = rtScore !== null ? rtScore * SS_RT_WEIGHT : 0;
+  // CRIT-1 — renormalización por maxPossible, igual que calculateSignalMetrics en psychometricCalculations.ts.
+  // Sin hits, rtComponent=0 y el máximo alcanzable del composite base es 75 (50+25).
+  // Sin renormalizar, un candidato con 0 hits pero sin falsas alarmas obtendría 25 sobre 75 → ~33
+  // al mostrar en pantalla, pero el admin veía el valor ya renormalizado (33) desde el pipeline.
+  // La división por maxPossible escala siempre al rango 0-100 sea cual sea el subconjunto disponible.
+  // ver docs/SCORING.md §4.2 — SS_HIT_RATE_WEIGHT, SS_FA_WEIGHT, SS_RT_WEIGHT, SS_FA_SCALE, SS_DECAY_FACTOR
+  const maxPossible = SS_HIT_RATE_WEIGHT + SS_FA_WEIGHT + (rtScore !== null ? SS_RT_WEIGHT : 0);
+  const attentionScore = Math.max(0, Math.min(100, Math.round(
+    (hitRate * SS_HIT_RATE_WEIGHT + (1 - Math.min(faRate * SS_FA_SCALE, 1)) * SS_FA_WEIGHT + rtComponent)
+    / maxPossible * 100
+    * (1 - decayIndex * SS_DECAY_FACTOR)
+  )));
 
   return { hits, misses, falseAlarms, meanRt, rtVariability, decayIndex, attentionScore };
 }
@@ -150,7 +188,11 @@ const ResultsScreen: React.FC<{ result: SignalSurgeResult; onContinue: () => voi
           <span className="ss-stat-lbl">Falsas alarmas</span>
         </div>
         <div className="ss-stat-card">
-          <span className="ss-stat-val">{result.meanRt}<span className="ss-stat-unit">ms</span></span>
+          <span className="ss-stat-val">
+            {result.meanRt !== undefined
+              ? <>{result.meanRt}<span className="ss-stat-unit">ms</span></>
+              : <span className="ss-stat-na" aria-label="Sin datos de tiempo de reacción">—</span>}
+          </span>
           <span className="ss-stat-lbl">TR medio</span>
         </div>
         <div className="ss-stat-card">

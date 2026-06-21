@@ -68,7 +68,7 @@ const seed: Database = {
         calculatedRisk: 64,
         profile: "Operador estratégico",
       },
-      personality: { domains: { O: 64, C: 78, E: 55, A: 82, N: 38 }, answeredAt: "2026-01-16T14:25:00.000Z", inconsistency: 12 },
+      personality: { domains: { O: 64, C: 78, E: 55, A: 82, N: 38 }, answeredAt: "2026-01-16T14:25:00.000Z", inconsistency: 12, partialDomains: [] },
       events: [],
     },
     {
@@ -83,7 +83,7 @@ const seed: Database = {
       completedAt: "2026-01-18T11:00:00.000Z",
       consentAccepted: true,
       behavioral: { adaptability: 91, prioritization: 63, executiveControl: 66, calculatedRisk: 81, profile: "Explorador calibrado" },
-      personality: { domains: { O: 81, C: 60, E: 72, A: 49, N: 44 }, answeredAt: "2026-01-18T10:55:00.000Z", inconsistency: 18 },
+      personality: { domains: { O: 81, C: 60, E: 72, A: 49, N: 44 }, answeredAt: "2026-01-18T10:55:00.000Z", inconsistency: 18, partialDomains: [] },
       events: [],
     },
     {
@@ -98,7 +98,7 @@ const seed: Database = {
       completedAt: "2026-01-20T10:15:00.000Z",
       consentAccepted: true,
       behavioral: { adaptability: 61, prioritization: 88, executiveControl: 84, calculatedRisk: 38, profile: "Operador estratégico" },
-      personality: { domains: { O: 58, C: 84, E: 47, A: 66, N: 33 }, answeredAt: "2026-01-20T10:10:00.000Z", inconsistency: 9 },
+      personality: { domains: { O: 58, C: 84, E: 47, A: 66, N: 33 }, answeredAt: "2026-01-20T10:10:00.000Z", inconsistency: 9, partialDomains: [] },
       events: [],
     },
     {
@@ -113,7 +113,7 @@ const seed: Database = {
       completedAt: "2026-01-22T15:45:00.000Z",
       consentAccepted: true,
       behavioral: { adaptability: 78, prioritization: 57, executiveControl: 59, calculatedRisk: 68, profile: "Explorador calibrado" },
-      personality: { domains: { O: 70, C: 55, E: 63, A: 71, N: 52 }, answeredAt: "2026-01-22T15:40:00.000Z", inconsistency: 21 },
+      personality: { domains: { O: 70, C: 55, E: 63, A: 71, N: 52 }, answeredAt: "2026-01-22T15:40:00.000Z", inconsistency: 21, partialDomains: [] },
       events: [],
     },
   ],
