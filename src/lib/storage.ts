@@ -7,7 +7,7 @@ const KEY = "signal-run-platform-v3";
 // la versión no coincide podemos migrar/normalizar en lugar de fallar en silencio.
 const SCHEMA_VERSION = 3;
 
-type Database = {
+export type Database = {
   candidates: Candidate[];
   positions: JobPosition[];
   schemaVersion?: number;

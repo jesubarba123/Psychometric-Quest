@@ -6,6 +6,18 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 export const supabase = url && anonKey ? createClient(url, anonKey) : null;
 export const isSupabaseConfigured = Boolean(supabase);
 
+// Lista blanca de administradores (correos), configurable con VITE_ADMIN_EMAILS
+// (separados por coma). Por defecto, el admin del README. La autenticación la
+// verifica Supabase; esta lista solo decide quién obtiene el rol de administrador.
+const adminEmails = ((import.meta.env.VITE_ADMIN_EMAILS as string | undefined) ?? "admin@signal.run")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdminEmail(email?: string | null) {
+  return Boolean(email && adminEmails.includes(email.trim().toLowerCase()));
+}
+
 export type OAuthProvider = "google" | "github" | "linkedin_oidc" | "azure";
 
 export async function signInWithProvider(provider: OAuthProvider) {
