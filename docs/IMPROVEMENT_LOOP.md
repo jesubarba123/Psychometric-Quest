@@ -81,9 +81,12 @@ capturar el resultado real, y por cada fallo emitir un **brief de arreglo** diri
 
 ## Fase 6 — Cierre y PR
 1. Confirma con evidencia que `typecheck`, `build` y `test:e2e` están **verdes**.
-1b. **Actualiza el pipeline visual:** si la mejora de hoy avanzó o completó algún ítem del proyecto,
-   edita su `status` (`done`/`wip`/`todo`) en `docs/pipeline.json` y la fecha `updated`, luego corre
-   `npm run pipeline` para regenerar `pipeline.html`. Inclúyelo en el commit/PR.
+1b. **Actualiza el pipeline visual — SIEMPRE, es parte del flujo (no opcional):** edita
+   `docs/pipeline.json` reflejando el estado tras la corrida de hoy: marca cualquier ítem que
+   avanzó o se completó (`done`/`wip`/`todo`), agrega ítems nuevos si surgieron, y actualiza la
+   fecha `updated` (aunque solo cambie la fecha). Luego corre `npm run pipeline` para regenerar
+   `pipeline.html`. Inclúyelo SIEMPRE en el commit/PR de la corrida — sin esto la corrida no se
+   considera cerrada.
 2. `git add -A && git commit` con un mensaje claro (qué mejoró y por qué).
 3. `git push -u origin mejora/AAAA-MM-DD`.
 4. Abre un PR. Preferido: `gh pr create --fill --base main`. Si `gh` no está disponible, deja la rama
