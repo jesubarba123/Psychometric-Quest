@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pipeline — Psychometric Quest — Talent Insights</title>
+<style>
+  :root{
+    --ink:#d8e8e4;--muted:#7a9898;--line:#2a3a48;--paper:#0e1318;--surface:#161d24;
+    --surface2:#1b242d;--signal:#4ecdc4;--green:#5cb88a;--amber:#e8a94a;--blue:#6aa8ff;
+    --font:"Inter",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#13202a,var(--paper));
+       color:var(--ink);font-family:var(--font);line-height:1.5;padding:32px 20px 64px}
+  .wrap{max-width:1060px;margin:0 auto}
+  header.top{margin-bottom:26px}
+  .eyebrow{color:var(--signal);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px;margin:0 0 6px}
+  h1{margin:0 0 4px;font-size:26px;letter-spacing:-.01em}
+  .tagline{color:var(--muted);margin:0 0 18px;font-size:14px}
+  .overall{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);
+           border-radius:14px;padding:16px 18px}
+  .overall .big{font-size:34px;font-weight:800;color:var(--signal);min-width:78px}
+  .overall .obar{flex:1}
+  .meta{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .bar{height:9px;border-radius:99px;background:#0c151b;border:1px solid var(--line);overflow:hidden}
+  .bar>span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--signal),var(--green))}
+  .strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:24px 0 30px}
+  .arrow{color:var(--muted);font-size:18px}
+  .node{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:120px;
+        padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+  .node-name{font-size:12.5px;font-weight:700;text-align:center}
+  .node-pct{font-size:12px;color:var(--muted)}
+  .node.done{border-color:rgba(92,184,138,.5)} .node.wip{border-color:rgba(232,169,74,.5)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .card.done{border-left:4px solid var(--green)} .card.wip{border-left:4px solid var(--amber)}
+  .card.todo{border-left:4px solid var(--line)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .card-head h2{font-size:15px;margin:0}
+  .chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;border:1px solid var(--line);white-space:nowrap}
+  .chip.done{color:var(--green);background:rgba(92,184,138,.1)}
+  .chip.wip{color:var(--amber);background:rgba(232,169,74,.1)}
+  .chip.todo{color:var(--muted);background:var(--surface2)}
+  .bar-meta{font-size:11.5px;color:var(--muted);margin:6px 0 12px}
+  ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .item{display:flex;gap:9px;align-items:flex-start}
+  .item.todo .i-label,.item.wip .i-label{color:var(--ink)}
+  .item.done .i-label{color:var(--muted)}
+  .i-icon{font-size:13px;line-height:1.3;flex:none}
+  .i-body{display:flex;flex-direction:column}
+  .i-label{font-size:13px}
+  .i-note{font-size:11.5px;color:var(--amber);margin-top:1px}
+  .pending{margin-top:34px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .pending h2{font-size:16px;margin:0 0 12px}
+  .pending h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+  .pending ul{margin:0;padding-left:2px;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .pending li{font-size:13px}
+  footer{color:var(--muted);font-size:12px;margin-top:30px;text-align:center}
+  code{background:var(--surface2);padding:1px 6px;border-radius:6px;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Pipeline del proyecto</p>
+    <h1>Psychometric Quest — Talent Insights</h1>
+    <p class="tagline">Plataforma de evaluación de talento (juegos conductuales + Big Five)</p>
+    <div class="overall">
+      <div class="big">59%</div>
+      <div class="obar">
+        <div class="bar"><span style="width:59%"></span></div>
+        <div class="meta">17/29 subtareas completas · 0/7 etapas listas · Actualizado: 2026-06-22</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="strip">
+      
+      <div class="node wip">
+        <span class="node-dot">🟡</span>
+        <span class="node-name">Infraestructura &amp; QA</span>
+        <span class="node-pct">80%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node wip">
+        <span class="node-dot">🟡</span>
+        <span class="node-name">Autenticación</span>
+        <span class="node-pct">75%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node wip">
+        <span class="node-dot">🟡</span>
+        <span class="node-name">Supabase / Backend</span>
+        <span class="node-pct">67%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node wip">
+        <span class="node-dot">🟡</span>
+        <span class="node-name">Migración de datos (DataRepo)</span>
+        <span class="node-pct">50%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node wip">
+        <span class="node-dot">🟡</span>
+        <span class="node-name">Validez psicométrica (código)</span>
+        <span class="node-pct">88%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node todo">
+        <span class="node-dot">⬜</span>
+        <span class="node-name">Validez con datos (dueño)</span>
+        <span class="node-pct">0%</span>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node todo">
+        <span class="node-dot">⬜</span>
+        <span class="node-name">Despliegue (Vercel)</span>
+        <span class="node-pct">0%</span>
+      </div></div>
+
+  <div class="grid">
+    <section class="card wip">
+      <header class="card-head">
+        <h2>Infraestructura &amp; QA</h2>
+        <span class="chip wip">🟡 En curso</span>
+      </header>
+      <div class="bar"><span style="width:80%"></span></div>
+      <div class="bar-meta">4/5 · 80%</div>
+      <ul class="items">
+        <li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Suite Playwright E2E (6 tests)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Arnés Vitest (unit tests)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Agentes globales + bucle de mejora 9am</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Gobernanza de uso (disclaimers)</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">CI en GitHub Actions</span><span class="i-note">Falta subir el workflow (token sin scope 'workflow')</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card wip">
+      <header class="card-head">
+        <h2>Autenticación</h2>
+        <span class="chip wip">🟡 En curso</span>
+      </header>
+      <div class="bar"><span style="width:75%"></span></div>
+      <div class="bar-meta">3/4 · 75%</div>
+      <ul class="items">
+        <li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Auth de admin real (rol + allowlist)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Login email/contraseña (Supabase)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Enrutado por rol (admin vs candidato)</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">Proveedores sociales OAuth (Google/GitHub/…)</span><span class="i-note">Requieren crear apps OAuth con secretos</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card wip">
+      <header class="card-head">
+        <h2>Supabase / Backend</h2>
+        <span class="chip wip">🟡 En curso</span>
+      </header>
+      <div class="bar"><span style="width:67%"></span></div>
+      <div class="bar-meta">2/3 · 67%</div>
+      <ul class="items">
+        <li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Proyecto Supabase + schema aplicado (10 tablas, RLS)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Bucket privado candidate-cvs</span></span>
+            </li><li class="item wip">
+              <span class="i-icon">🟡</span>
+              <span class="i-body"><span class="i-label">Crear/confirmar usuario admin</span><span class="i-note">jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card wip">
+      <header class="card-head">
+        <h2>Migración de datos (DataRepo)</h2>
+        <span class="chip wip">🟡 En curso</span>
+      </header>
+      <div class="bar"><span style="width:50%"></span></div>
+      <div class="bar-meta">1/2 · 50%</div>
+      <ul class="items">
+        <li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Fase 1: interfaz DataRepo + LocalRepo + Vitest</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">Fases 2–9: SupabaseRepo, multi-tenant, CV a Storage</span><span class="i-note">Spec y plan de Fase 1 ya en main; faltan 8 fases</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card wip">
+      <header class="card-head">
+        <h2>Validez psicométrica (código)</h2>
+        <span class="chip wip">🟡 En curso</span>
+      </header>
+      <div class="bar"><span style="width:88%"></span></div>
+      <div class="bar-meta">7/8 · 88%</div>
+      <ul class="items">
+        <li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C1 — Banco fijo de ítems Raven</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C2 — Fiabilidad α de Cronbach + badge</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C3 — Sin placeholders en el cálculo</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C4 — Bandas de incertidumbre + categoría</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C5 — Scoring documentado + test de regresión</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C6 — Sin doble conteo atención/velocidad</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">C7 — Big Five anclado (0–100 ≠ percentil)</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">C8 — Revisar traducción IPIP</span><span class="i-note">Necesita tu fuente IPIP / back-translation</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card todo">
+      <header class="card-head">
+        <h2>Validez con datos (dueño)</h2>
+        <span class="chip todo">⬜ Pendiente</span>
+      </header>
+      <div class="bar"><span style="width:0%"></span></div>
+      <div class="bar-meta">0/4 · 0%</div>
+      <ul class="items">
+        <li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">N2 — N≥30 outcomes reales de contratados</span><span class="i-note">Bloqueante de validez de criterio</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">N3/N4 — N≥200 para normas y factorial</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">N5 — Revisión legal + estrategia de equidad</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">N1 — Persistir outcomes en Supabase</span></span>
+            </li>
+      </ul>
+    </section>
+    <section class="card todo">
+      <header class="card-head">
+        <h2>Despliegue (Vercel)</h2>
+        <span class="chip todo">⬜ Pendiente</span>
+      </header>
+      <div class="bar"><span style="width:0%"></span></div>
+      <div class="bar-meta">0/3 · 0%</div>
+      <ul class="items">
+        <li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">Env vars en Vercel (URL + anon key + admin)</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">Deploy de producción</span></span>
+            </li><li class="item todo">
+              <span class="i-icon">⬜</span>
+              <span class="i-body"><span class="i-label">Smoke post-deploy + verificar RLS</span></span>
+            </li>
+      </ul>
+    </section></div>
+
+  <div class="pending">
+    <h2>🔭 Lo que falta ahora</h2>
+    <h3>En curso</h3><ul><li><span class="i-icon">🟡</span> <strong>Supabase / Backend:</strong> Crear/confirmar usuario admin <span class="i-note">— jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario</span></li></ul>
+    <h3>Pendiente</h3><ul><li><span class="i-icon">⬜</span> <strong>Infraestructura &amp; QA:</strong> CI en GitHub Actions <span class="i-note">— Falta subir el workflow (token sin scope 'workflow')</span></li><li><span class="i-icon">⬜</span> <strong>Autenticación:</strong> Proveedores sociales OAuth (Google/GitHub/…) <span class="i-note">— Requieren crear apps OAuth con secretos</span></li><li><span class="i-icon">⬜</span> <strong>Migración de datos (DataRepo):</strong> Fases 2–9: SupabaseRepo, multi-tenant, CV a Storage <span class="i-note">— Spec y plan de Fase 1 ya en main; faltan 8 fases</span></li><li><span class="i-icon">⬜</span> <strong>Validez psicométrica (código):</strong> C8 — Revisar traducción IPIP <span class="i-note">— Necesita tu fuente IPIP / back-translation</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N2 — N≥30 outcomes reales de contratados <span class="i-note">— Bloqueante de validez de criterio</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N3/N4 — N≥200 para normas y factorial</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N5 — Revisión legal + estrategia de equidad</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N1 — Persistir outcomes en Supabase</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Env vars en Vercel (URL + anon key + admin)</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Deploy de producción</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Smoke post-deploy + verificar RLS</li></ul>
+    
+  </div>
+
+  <footer>
+    Generado desde <code>docs/pipeline.json</code> · actualizá con <code>npm run pipeline</code> (o lo hace el bucle de las 9am).
+  </footer>
+</div>
+</body>
+</html>

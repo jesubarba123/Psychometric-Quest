@@ -1,0 +1,78 @@
+{
+  "project": "Psychometric Quest — Talent Insights",
+  "updated": "2026-06-22",
+  "tagline": "Plataforma de evaluación de talento (juegos conductuales + Big Five)",
+  "stages": [
+    {
+      "id": "infra",
+      "name": "Infraestructura & QA",
+      "items": [
+        { "label": "Suite Playwright E2E (6 tests)", "status": "done" },
+        { "label": "Arnés Vitest (unit tests)", "status": "done" },
+        { "label": "Agentes globales + bucle de mejora 9am", "status": "done" },
+        { "label": "Gobernanza de uso (disclaimers)", "status": "done" },
+        { "label": "CI en GitHub Actions", "status": "todo", "note": "Falta subir el workflow (token sin scope 'workflow')" }
+      ]
+    },
+    {
+      "id": "auth",
+      "name": "Autenticación",
+      "items": [
+        { "label": "Auth de admin real (rol + allowlist)", "status": "done" },
+        { "label": "Login email/contraseña (Supabase)", "status": "done" },
+        { "label": "Enrutado por rol (admin vs candidato)", "status": "done" },
+        { "label": "Proveedores sociales OAuth (Google/GitHub/…)", "status": "todo", "note": "Requieren crear apps OAuth con secretos" }
+      ]
+    },
+    {
+      "id": "backend",
+      "name": "Supabase / Backend",
+      "items": [
+        { "label": "Proyecto Supabase + schema aplicado (10 tablas, RLS)", "status": "done" },
+        { "label": "Bucket privado candidate-cvs", "status": "done" },
+        { "label": "Crear/confirmar usuario admin", "status": "wip", "note": "jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario" }
+      ]
+    },
+    {
+      "id": "data",
+      "name": "Migración de datos (DataRepo)",
+      "items": [
+        { "label": "Fase 1: interfaz DataRepo + LocalRepo + Vitest", "status": "done" },
+        { "label": "Fases 2–9: SupabaseRepo, multi-tenant, CV a Storage", "status": "todo", "note": "Spec y plan de Fase 1 ya en main; faltan 8 fases" }
+      ]
+    },
+    {
+      "id": "psychometrics",
+      "name": "Validez psicométrica (código)",
+      "items": [
+        { "label": "C1 — Banco fijo de ítems Raven", "status": "done" },
+        { "label": "C2 — Fiabilidad α de Cronbach + badge", "status": "done" },
+        { "label": "C3 — Sin placeholders en el cálculo", "status": "done" },
+        { "label": "C4 — Bandas de incertidumbre + categoría", "status": "done" },
+        { "label": "C5 — Scoring documentado + test de regresión", "status": "done" },
+        { "label": "C6 — Sin doble conteo atención/velocidad", "status": "done" },
+        { "label": "C7 — Big Five anclado (0–100 ≠ percentil)", "status": "done" },
+        { "label": "C8 — Revisar traducción IPIP", "status": "todo", "note": "Necesita tu fuente IPIP / back-translation" }
+      ]
+    },
+    {
+      "id": "validity_data",
+      "name": "Validez con datos (dueño)",
+      "items": [
+        { "label": "N2 — N≥30 outcomes reales de contratados", "status": "todo", "note": "Bloqueante de validez de criterio" },
+        { "label": "N3/N4 — N≥200 para normas y factorial", "status": "todo" },
+        { "label": "N5 — Revisión legal + estrategia de equidad", "status": "todo" },
+        { "label": "N1 — Persistir outcomes en Supabase", "status": "todo" }
+      ]
+    },
+    {
+      "id": "deploy",
+      "name": "Despliegue (Vercel)",
+      "items": [
+        { "label": "Env vars en Vercel (URL + anon key + admin)", "status": "todo" },
+        { "label": "Deploy de producción", "status": "todo" },
+        { "label": "Smoke post-deploy + verificar RLS", "status": "todo" }
+      ]
+    }
+  ]
+}
