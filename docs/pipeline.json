@@ -1,6 +1,6 @@
 {
   "project": "Psychometric Quest — Talent Insights",
-  "updated": "2026-06-22",
+  "updated": "2026-06-23",
   "tagline": "Plataforma de evaluación de talento (juegos conductuales + Big Five)",
   "stages": [
     {
@@ -30,6 +30,7 @@
       "items": [
         { "label": "Proyecto Supabase + schema aplicado (10 tablas, RLS)", "status": "done" },
         { "label": "Bucket privado candidate-cvs", "status": "done" },
+        { "label": "Flujo de invitación seguro en prod (sin código demo precargado)", "status": "done" },
         { "label": "Crear/confirmar usuario admin", "status": "wip", "note": "jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario" }
       ]
     },
