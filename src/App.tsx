@@ -631,13 +631,13 @@ function CvMatchReview({
 }
 
 function AccessCode({ candidate, onComplete }: { candidate: Candidate; onComplete: (candidate: Candidate) => void }) {
-  const [code, setCode] = useState("DEMO-2026");
+  const [code, setCode] = useState(isSupabaseConfigured ? "" : "DEMO-2026");
   const [error, setError] = useState("");
 
   function submit() {
     const linked = attachCandidateInvitation(candidate, code);
     if (!linked) {
-      setError("No encontramos esa invitación. Revisa el código o pide uno nuevo al administrador.");
+      setError("Código no encontrado. Verifica mayúsculas y guiones tal como llegó en tu correo de invitación. Si el problema persiste, escribe a tu reclutador.");
       return;
     }
     onComplete(linked);
@@ -658,7 +658,7 @@ function AccessCode({ candidate, onComplete }: { candidate: Candidate; onComplet
       </div>
       <label>
         Código de invitación
-        <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="DEMO-2026" />
+        <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Ej. ABC-2026" />
       </label>
       {error && <p className="error">{error}</p>}
       <button className="button" onClick={submit}>Validar y continuar</button>
