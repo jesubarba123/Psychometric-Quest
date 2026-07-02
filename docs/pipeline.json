@@ -1,6 +1,6 @@
 {
   "project": "Psychometric Quest — Talent Insights",
-  "updated": "2026-06-23",
+  "updated": "2026-07-02",
   "tagline": "Plataforma de evaluación de talento (juegos conductuales + Big Five)",
   "stages": [
     {
@@ -39,7 +39,8 @@
       "name": "Migración de datos (DataRepo)",
       "items": [
         { "label": "Fase 1: interfaz DataRepo + LocalRepo + Vitest", "status": "done" },
-        { "label": "Fases 2–9: SupabaseRepo, multi-tenant, CV a Storage", "status": "todo", "note": "Spec y plan de Fase 1 ya en main; faltan 8 fases" }
+        { "label": "Fase 2 (E1): store snapshot + App cableado a DataRepo", "status": "done", "note": "Bucle Fable diseña → Sonnet implementa → Fable revisa; 94 unit + 6 E2E verdes" },
+        { "label": "Fases 3–9 (E2–E8): SupabaseRepo, outcomes server-side, multi-tenant, CV a Storage", "status": "todo", "note": "Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md" }
       ]
     },
     {
