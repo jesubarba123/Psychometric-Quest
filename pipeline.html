@@ -67,10 +67,10 @@
     <h1>Psychometric Quest — Talent Insights</h1>
     <p class="tagline">Plataforma de evaluación de talento (juegos conductuales + Big Five)</p>
     <div class="overall">
-      <div class="big">61%</div>
+      <div class="big">67%</div>
       <div class="obar">
-        <div class="bar"><span style="width:61%"></span></div>
-        <div class="meta">19/31 subtareas completas · 0/7 etapas listas · Actualizado: 2026-07-02</div>
+        <div class="bar"><span style="width:67%"></span></div>
+        <div class="meta">22/33 subtareas completas · 1/7 etapas listas · Actualizado: 2026-07-02</div>
       </div>
     </div>
   </header>
@@ -89,16 +89,16 @@
         <span class="node-pct">75%</span>
       </div>
       <span class="arrow" aria-hidden="true">→</span>
-      <div class="node wip">
-        <span class="node-dot">🟡</span>
+      <div class="node done">
+        <span class="node-dot">✅</span>
         <span class="node-name">Supabase / Backend</span>
-        <span class="node-pct">75%</span>
+        <span class="node-pct">100%</span>
       </div>
       <span class="arrow" aria-hidden="true">→</span>
       <div class="node wip">
         <span class="node-dot">🟡</span>
         <span class="node-name">Migración de datos (DataRepo)</span>
-        <span class="node-pct">67%</span>
+        <span class="node-pct">75%</span>
       </div>
       <span class="arrow" aria-hidden="true">→</span>
       <div class="node wip">
@@ -169,13 +169,13 @@
             </li>
       </ul>
     </section>
-    <section class="card wip">
+    <section class="card done">
       <header class="card-head">
         <h2>Supabase / Backend</h2>
-        <span class="chip wip">🟡 En curso</span>
+        <span class="chip done">✅ Listo</span>
       </header>
-      <div class="bar"><span style="width:75%"></span></div>
-      <div class="bar-meta">3/4 · 75%</div>
+      <div class="bar"><span style="width:100%"></span></div>
+      <div class="bar-meta">5/5 · 100%</div>
       <ul class="items">
         <li class="item done">
               <span class="i-icon">✅</span>
@@ -186,9 +186,12 @@
             </li><li class="item done">
               <span class="i-icon">✅</span>
               <span class="i-body"><span class="i-label">Flujo de invitación seguro en prod (sin código demo precargado)</span></span>
-            </li><li class="item wip">
-              <span class="i-icon">🟡</span>
-              <span class="i-body"><span class="i-label">Crear/confirmar usuario admin</span><span class="i-note">jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Crear/confirmar usuario admin</span><span class="i-note">jesubarba123@gmail.com creado y confirmado; en admin_allowlist (DB)</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Rol admin server-side (admin_allowlist + ensure_admin_org)</span><span class="i-note">Migraciones 0002/0003 aplicadas en prod; VITE_ADMIN_EMAILS queda solo como hint de UI</span></span>
             </li>
       </ul>
     </section>
@@ -197,8 +200,8 @@
         <h2>Migración de datos (DataRepo)</h2>
         <span class="chip wip">🟡 En curso</span>
       </header>
-      <div class="bar"><span style="width:67%"></span></div>
-      <div class="bar-meta">2/3 · 67%</div>
+      <div class="bar"><span style="width:75%"></span></div>
+      <div class="bar-meta">3/4 · 75%</div>
       <ul class="items">
         <li class="item done">
               <span class="i-icon">✅</span>
@@ -206,9 +209,12 @@
             </li><li class="item done">
               <span class="i-icon">✅</span>
               <span class="i-body"><span class="i-label">Fase 2 (E1): store snapshot + App cableado a DataRepo</span><span class="i-note">Bucle Fable diseña → Sonnet implementa → Fable revisa; 94 unit + 6 E2E verdes</span></span>
+            </li><li class="item done">
+              <span class="i-icon">✅</span>
+              <span class="i-body"><span class="i-label">Fase 3 (E2): SupabaseRepo sesión + ensure_admin_org server-side</span><span class="i-note">1 vuelta de review (boot no se bloquea si hydrate falla); 101 unit + 6 E2E verdes</span></span>
             </li><li class="item todo">
               <span class="i-icon">⬜</span>
-              <span class="i-body"><span class="i-label">Fases 3–9 (E2–E8): SupabaseRepo, outcomes server-side, multi-tenant, CV a Storage</span><span class="i-note">Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md</span></span>
+              <span class="i-body"><span class="i-label">Fases 4–9 (E3–E8): posiciones, escritura/lectura candidato, CV a Storage, outcomes, multi-tenant</span><span class="i-note">Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md</span></span>
             </li>
       </ul>
     </section>
@@ -293,8 +299,8 @@
 
   <div class="pending">
     <h2>🔭 Lo que falta ahora</h2>
-    <h3>En curso</h3><ul><li><span class="i-icon">🟡</span> <strong>Supabase / Backend:</strong> Crear/confirmar usuario admin <span class="i-note">— jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario</span></li></ul>
-    <h3>Pendiente</h3><ul><li><span class="i-icon">⬜</span> <strong>Infraestructura &amp; QA:</strong> CI en GitHub Actions <span class="i-note">— Falta subir el workflow (token sin scope 'workflow')</span></li><li><span class="i-icon">⬜</span> <strong>Autenticación:</strong> Proveedores sociales OAuth (Google/GitHub/…) <span class="i-note">— Requieren crear apps OAuth con secretos</span></li><li><span class="i-icon">⬜</span> <strong>Migración de datos (DataRepo):</strong> Fases 3–9 (E2–E8): SupabaseRepo, outcomes server-side, multi-tenant, CV a Storage <span class="i-note">— Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md</span></li><li><span class="i-icon">⬜</span> <strong>Validez psicométrica (código):</strong> C8 — Revisar traducción IPIP <span class="i-note">— Necesita tu fuente IPIP / back-translation</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N2 — N≥30 outcomes reales de contratados <span class="i-note">— Bloqueante de validez de criterio</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N3/N4 — N≥200 para normas y factorial</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N5 — Revisión legal + estrategia de equidad</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N1 — Persistir outcomes en Supabase</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Env vars en Vercel (URL + anon key + admin)</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Deploy de producción</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Smoke post-deploy + verificar RLS</li></ul>
+    
+    <h3>Pendiente</h3><ul><li><span class="i-icon">⬜</span> <strong>Infraestructura &amp; QA:</strong> CI en GitHub Actions <span class="i-note">— Falta subir el workflow (token sin scope 'workflow')</span></li><li><span class="i-icon">⬜</span> <strong>Autenticación:</strong> Proveedores sociales OAuth (Google/GitHub/…) <span class="i-note">— Requieren crear apps OAuth con secretos</span></li><li><span class="i-icon">⬜</span> <strong>Migración de datos (DataRepo):</strong> Fases 4–9 (E3–E8): posiciones, escritura/lectura candidato, CV a Storage, outcomes, multi-tenant <span class="i-note">— Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md</span></li><li><span class="i-icon">⬜</span> <strong>Validez psicométrica (código):</strong> C8 — Revisar traducción IPIP <span class="i-note">— Necesita tu fuente IPIP / back-translation</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N2 — N≥30 outcomes reales de contratados <span class="i-note">— Bloqueante de validez de criterio</span></li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N3/N4 — N≥200 para normas y factorial</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N5 — Revisión legal + estrategia de equidad</li><li><span class="i-icon">⬜</span> <strong>Validez con datos (dueño):</strong> N1 — Persistir outcomes en Supabase</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Env vars en Vercel (URL + anon key + admin)</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Deploy de producción</li><li><span class="i-icon">⬜</span> <strong>Despliegue (Vercel):</strong> Smoke post-deploy + verificar RLS</li></ul>
     
   </div>
 

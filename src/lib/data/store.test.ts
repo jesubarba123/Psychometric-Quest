@@ -1,8 +1,33 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { hydrate, snapshot, createPosition } from "./store";
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+describe("store — hydrate() ante fallo del repo", () => {
+  it("propaga el error de repo.loadDatabase() pero snapshot() sigue devolviendo el último estado válido sin lanzar", async () => {
+    vi.resetModules();
+    vi.doMock("./repo", () => ({
+      repo: {
+        loadDatabase: vi.fn().mockRejectedValue(new Error("SupabaseRepo.loadDatabase: no implementado aún (llega en E5 del plan)")),
+      },
+    }));
+
+    const storeWithFailingRepo = await import("./store");
+
+    // snapshot() antes de hydrate() no lanza y devuelve el estado inicial vacío.
+    expect(storeWithFailingRepo.snapshot()).toEqual({ candidates: [], positions: [] });
+
+    // hydrate() propaga el rechazo del repo.
+    await expect(storeWithFailingRepo.hydrate()).rejects.toThrow("no implementado");
+
+    // snapshot() sigue devolviendo el último estado válido (el inicial) sin lanzar.
+    expect(storeWithFailingRepo.snapshot()).toEqual({ candidates: [], positions: [] });
+
+    vi.doUnmock("./repo");
+    vi.resetModules();
+  });
 });
 
 describe("store", () => {

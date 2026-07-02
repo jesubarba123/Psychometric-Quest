@@ -31,7 +31,8 @@
         { "label": "Proyecto Supabase + schema aplicado (10 tablas, RLS)", "status": "done" },
         { "label": "Bucket privado candidate-cvs", "status": "done" },
         { "label": "Flujo de invitación seguro en prod (sin código demo precargado)", "status": "done" },
-        { "label": "Crear/confirmar usuario admin", "status": "wip", "note": "jesubarba123@gmail.com en allowlist; falta crear/confirmar el usuario" }
+        { "label": "Crear/confirmar usuario admin", "status": "done", "note": "jesubarba123@gmail.com creado y confirmado; en admin_allowlist (DB)" },
+        { "label": "Rol admin server-side (admin_allowlist + ensure_admin_org)", "status": "done", "note": "Migraciones 0002/0003 aplicadas en prod; VITE_ADMIN_EMAILS queda solo como hint de UI" }
       ]
     },
     {
@@ -40,7 +41,8 @@
       "items": [
         { "label": "Fase 1: interfaz DataRepo + LocalRepo + Vitest", "status": "done" },
         { "label": "Fase 2 (E1): store snapshot + App cableado a DataRepo", "status": "done", "note": "Bucle Fable diseña → Sonnet implementa → Fable revisa; 94 unit + 6 E2E verdes" },
-        { "label": "Fases 3–9 (E2–E8): SupabaseRepo, outcomes server-side, multi-tenant, CV a Storage", "status": "todo", "note": "Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md" }
+        { "label": "Fase 3 (E2): SupabaseRepo sesión + ensure_admin_org server-side", "status": "done", "note": "1 vuelta de review (boot no se bloquea si hydrate falla); 101 unit + 6 E2E verdes" },
+        { "label": "Fases 4–9 (E3–E8): posiciones, escritura/lectura candidato, CV a Storage, outcomes, multi-tenant", "status": "todo", "note": "Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md" }
       ]
     },
     {

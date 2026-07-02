@@ -3,10 +3,19 @@ import type { Database } from "../storage";
 
 export type { Database };
 
+export type SessionContext = {
+  userId: string;
+  email: string;
+  role: "admin" | "candidate";
+  organizationId: string | null;
+};
+
 // Interfaz de acceso a datos, app-facing y denormalizada (espeja storage.ts).
 // Todas las operaciones son async para permitir un backend remoto (Supabase).
 export interface DataRepo {
   loadDatabase(): Promise<Database>;
+  getSessionContext(): Promise<SessionContext | null>;
+  ensureAdminOrg(orgName?: string): Promise<{ organizationId: string }>;
   upsertCandidate(candidate: Candidate): Promise<void>;
   recordCandidateAccess(candidate: Candidate): Promise<Candidate>;
   createCandidate(input: {

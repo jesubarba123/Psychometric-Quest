@@ -13,6 +13,7 @@ import { PsychometricDashboard } from "./components/analytics/PsychometricDashbo
 import { MeasurementReference } from "./components/analytics/MeasurementReference";
 import { ReliabilitySection } from "./components/analytics/ReliabilitySection";
 import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, hydrate, recordCandidateAccess, snapshot, upsertCandidate } from "./lib/data/store";
+import { repo } from "./lib/data/repo";
 import { isAdminEmail, isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
 import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculations";
 import { computeComposite } from "./utils/compositeAxes";
@@ -42,7 +43,9 @@ export function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    hydrate().then(() => setReady(true));
+    hydrate()
+      .catch((e) => console.error("hydrate falló (esperado en modo Supabase hasta E5):", e))
+      .finally(() => setReady(true));
   }, []);
 
   // A1 — mount-only; the internal `role` check prevents double-enter if the
@@ -83,8 +86,16 @@ export function App() {
   // resto → flujo de candidato. Centraliza la decisión para que la sesión, el
   // login y los cambios de estado de auth sean consistentes.
   async function routeAuthedUser(user: { email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }) {
-    if (isAdminUser(user)) enterAdmin();
-    else enterCandidate(await candidateFromSupabaseUser(user));
+    if (isAdminUser(user)) {
+      if (isSupabaseConfigured) {
+        // Provisiona (o recupera) la org del admin server-side. No bloquea la
+        // entrada al dashboard si falla: el dashboard prod real llega en E5.
+        await repo.ensureAdminOrg().catch((e) => {
+          console.error("ensureAdminOrg falló:", e);
+        });
+      }
+      enterAdmin();
+    } else enterCandidate(await candidateFromSupabaseUser(user));
   }
 
   async function updateCandidate(next: Candidate, nextScreen?: Screen) {
