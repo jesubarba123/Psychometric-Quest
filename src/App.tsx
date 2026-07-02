@@ -12,7 +12,7 @@ import { CandidateScatter3D } from "./components/analytics/CandidateScatter3D";
 import { PsychometricDashboard } from "./components/analytics/PsychometricDashboard";
 import { MeasurementReference } from "./components/analytics/MeasurementReference";
 import { ReliabilitySection } from "./components/analytics/ReliabilitySection";
-import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, loadDatabase, recordCandidateAccess, upsertCandidate } from "./lib/storage";
+import { attachCandidateInvitation, createCandidate, createCandidateAccount, createPosition, exportCsv, exportJson, hydrate, recordCandidateAccess, snapshot, upsertCandidate } from "./lib/data/store";
 import { isAdminEmail, isSupabaseConfigured, signInWithEmail, signInWithProvider, signUpWithEmail, supabase, type OAuthProvider } from "./lib/supabaseClient";
 import { buildCandidateProfileFromEvents } from "./utils/psychometricCalculations";
 import { computeComposite } from "./utils/compositeAxes";
@@ -39,6 +39,11 @@ export function App() {
   const [role, setRole] = useState<Role | null>(null);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [dbVersion, setDbVersion] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    hydrate().then(() => setReady(true));
+  }, []);
 
   // A1 — mount-only; the internal `role` check prevents double-enter if the
   // auth state fires while a session is already active.
@@ -67,8 +72,8 @@ export function App() {
     setScreen("admin");
   }
 
-  function enterCandidate(found: Candidate) {
-    const active = recordCandidateAccess(found);
+  async function enterCandidate(found: Candidate) {
+    const active = await recordCandidateAccess(found);
     setRole("candidate");
     setCandidate(active);
     setScreen(active.status === "completed" ? "candidate-report" : "intro");
@@ -77,17 +82,19 @@ export function App() {
   // Enruta a un usuario autenticado por Supabase según su rol: admin → dashboard,
   // resto → flujo de candidato. Centraliza la decisión para que la sesión, el
   // login y los cambios de estado de auth sean consistentes.
-  function routeAuthedUser(user: { email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }) {
+  async function routeAuthedUser(user: { email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }) {
     if (isAdminUser(user)) enterAdmin();
-    else enterCandidate(candidateFromSupabaseUser(user));
+    else enterCandidate(await candidateFromSupabaseUser(user));
   }
 
-  function updateCandidate(next: Candidate, nextScreen?: Screen) {
-    upsertCandidate(next);
+  async function updateCandidate(next: Candidate, nextScreen?: Screen) {
+    await upsertCandidate(next);
     setCandidate(next);
     refresh();
     if (nextScreen) setScreen(nextScreen);
   }
+
+  if (!ready) return <div className="app-shell" />;
 
   return (
     <main className={`shell ${screen === "login" ? "login-shell" : ""}`}>
@@ -186,7 +193,7 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
     }
 
     const label = provider === "outlook" ? "Outlook" : provider[0].toUpperCase() + provider.slice(1);
-    const created = createCandidateAccount({
+    const created = await createCandidateAccount({
       name: `${label} Candidate`,
       email: `${provider}.candidate@example.com`,
       provider,
@@ -215,7 +222,7 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
         return;
       }
     }
-    const created = createCandidateAccount({ ...signup, passwordDigest: await digestPassword(signup.email, signup.password), provider: "email" });
+    const created = await createCandidateAccount({ ...signup, passwordDigest: await digestPassword(signup.email, signup.password), provider: "email" });
     onCandidate(created);
   }
 
@@ -233,12 +240,12 @@ function Login({ onAdmin, onCandidate }: { onAdmin: () => void; onCandidate: (ca
       }
       if (data.user) {
         if (isAdminUser(data.user)) onAdmin();
-        else onCandidate(candidateFromSupabaseUser(data.user));
+        else onCandidate(await candidateFromSupabaseUser(data.user));
       }
       return;
     }
 
-    const existing = loadDatabase().candidates.find((item) => item.email.trim().toLowerCase() === signin.email.trim().toLowerCase());
+    const existing = snapshot().candidates.find((item) => item.email.trim().toLowerCase() === signin.email.trim().toLowerCase());
     if (!existing?.passwordDigest) {
       setError("No encontramos una cuenta local con contraseña para ese correo.");
       return;
@@ -404,7 +411,7 @@ function CandidateIntro({ candidate, onContinue }: { candidate: Candidate; onCon
 const ENGLISH_LEVELS: EnglishLevel[] = ["Básico", "Intermedio", "Avanzado", "Nativo / Bilingüe"];
 
 function CandidateProfile({ candidate, onComplete }: { candidate: Candidate; onComplete: (candidate: Candidate) => void }) {
-  const positions = loadDatabase().positions.filter((position) => position.status === "open");
+  const positions = snapshot().positions.filter((position) => position.status === "open");
   const [profile, setProfile] = useState({
     name: candidate.name,
     email: candidate.email,
@@ -588,7 +595,7 @@ function CvMatchReview({
   onBack: (candidate: Candidate) => void;
   onContinue: (candidate: Candidate) => void;
 }) {
-  const position = loadDatabase().positions.find((item) => item.id === candidate.positionId);
+  const position = snapshot().positions.find((item) => item.id === candidate.positionId);
   if (!position) return null;
   const match = calculateCvMatch(candidate, position);
 
@@ -634,9 +641,9 @@ function AccessCode({ candidate, onComplete }: { candidate: Candidate; onComplet
   const [code, setCode] = useState(isSupabaseConfigured ? "" : "DEMO-2026");
   const [error, setError] = useState("");
 
-  function submit() {
+  async function submit() {
     if (!code.trim()) { setError("Ingresa el código de invitación que recibiste por correo."); return; }
-    const linked = attachCandidateInvitation(candidate, code);
+    const linked = await attachCandidateInvitation(candidate, code);
     if (!linked) {
       setError("Código no encontrado. Verifica mayúsculas y guiones tal como llegó en tu correo de invitación. Si el problema persiste, escribe a tu reclutador.");
       return;
@@ -696,7 +703,7 @@ function Consent({ candidate, onAccept }: { candidate: Candidate; onAccept: (can
 
 // Menú de pruebas: el candidato elige cuál hacer y en qué orden (solo las habilitadas).
 function Assessments({ candidate, onComplete }: { candidate: Candidate; onComplete: (candidate: Candidate) => void }) {
-  const position = loadDatabase().positions.find((item) => item.id === candidate.positionId);
+  const position = snapshot().positions.find((item) => item.id === candidate.positionId);
   const enabled = enabledAssessmentsFor(position?.enabledAssessments);
   const [work, setWork] = useState<Candidate>({ ...candidate, status: "started" });
   const [active, setActive] = useState<string | null>(null);
@@ -1395,7 +1402,7 @@ function DecisionDisclaimer() {
 }
 
 function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
-  const db = loadDatabase();
+  const db = snapshot();
   const [form, setForm] = useState({ name: "", email: "", phone: "", positionId: db.positions[0]?.id ?? "" });
   const [positionForm, setPositionForm] = useState({ title: "", department: "", location: "", jd: "" });
   const [positionAssessments, setPositionAssessments] = useState<string[]>([...ALL_ASSESSMENT_KEYS]);
@@ -1453,18 +1460,18 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
     return <AdminCandidateDetail candidate={detailCandidate} positions={db.positions} pool={completed} onBack={() => setDetailId(null)} />;
   }
 
-  function addCandidate() {
+  async function addCandidate() {
     const position = db.positions.find((item) => item.id === form.positionId);
     if (!form.name || !form.email || !position) return;
-    createCandidate({ ...form, roleTarget: position.title });
+    await createCandidate({ ...form, roleTarget: position.title });
     setForm({ name: "", email: "", phone: "", positionId: db.positions[0]?.id ?? "" });
     onRefresh();
   }
 
-  function addPosition() {
+  async function addPosition() {
     if (!positionForm.title || !positionForm.jd) return;
     if (positionAssessments.length === 0) return; // al menos una prueba
-    createPosition({ ...positionForm, enabledAssessments: positionAssessments });
+    await createPosition({ ...positionForm, enabledAssessments: positionAssessments });
     setPositionForm({ title: "", department: "", location: "", jd: "" });
     setPositionAssessments([...ALL_ASSESSMENT_KEYS]);
     onRefresh();
@@ -1493,9 +1500,9 @@ function AdminDashboard({ onRefresh }: { onRefresh: () => void }) {
             )}
           </div>
           <button className="button secondary" onClick={() => setShowMeasRef(true)} title="Qué mide cada prueba, con su sustento">Ficha de medición</button>
-          <button className="button secondary" onClick={() => downloadFile("psychometric-quest-export.csv", exportCsv(), "text/csv")}>Exportar CSV</button>
+          <button className="button secondary" onClick={async () => downloadFile("psychometric-quest-export.csv", await exportCsv(), "text/csv")}>Exportar CSV</button>
           <button className="button secondary" onClick={() => downloadFile("dataset-validacion.csv", buildValidationCsv(db.candidates, db.positions), "text/csv")} title="Predictores + outcome, una fila por candidato, listo para análisis de validez">Dataset validación</button>
-          <button className="button" onClick={() => downloadFile("psychometric-quest-export.json", exportJson(), "application/json")}>Exportar JSON</button>
+          <button className="button" onClick={async () => downloadFile("psychometric-quest-export.json", await exportJson(), "application/json")}>Exportar JSON</button>
         </div>
       </div>
       <DecisionDisclaimer />
@@ -1945,7 +1952,7 @@ function OutcomePanel({ candidate }: { candidate: Candidate }) {
   const [note, setNote] = useState<string>(candidate.outcome?.note ?? "");
   const [saved, setSaved] = useState(false);
 
-  function save() {
+  async function save() {
     const outcome: CandidateOutcome = {
       decision,
       performanceRating: decision === "hired" && rating > 0 ? rating : undefined,
@@ -1953,7 +1960,7 @@ function OutcomePanel({ candidate }: { candidate: Candidate }) {
       note: note.trim() || undefined,
       updatedAt: new Date().toISOString(),
     };
-    upsertCandidate({ ...candidate, outcome });
+    await upsertCandidate({ ...candidate, outcome });
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   }
@@ -2077,7 +2084,7 @@ function isAdminUser(user: { email?: string; user_metadata?: Record<string, unkn
   return role === "admin" || isAdminEmail(user.email);
 }
 
-function candidateFromSupabaseUser(user: {
+async function candidateFromSupabaseUser(user: {
   email?: string;
   user_metadata?: Record<string, unknown>;
   app_metadata?: Record<string, unknown>;
