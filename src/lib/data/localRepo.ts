@@ -1,5 +1,5 @@
 import type { Candidate, JobPosition } from "../../types";
-import type { Database, DataRepo } from "./types";
+import type { Database, DataRepo, SessionContext } from "./types";
 import {
   loadDatabase,
   upsertCandidate,
@@ -18,6 +18,13 @@ import {
 export class LocalRepo implements DataRepo {
   async loadDatabase(): Promise<Database> {
     return loadDatabase();
+  }
+  async getSessionContext(): Promise<SessionContext | null> {
+    // El modo demo no tiene sesión Supabase.
+    return null;
+  }
+  async ensureAdminOrg(): Promise<{ organizationId: string }> {
+    return { organizationId: "org-demo" };
   }
   async upsertCandidate(candidate: Candidate): Promise<void> {
     upsertCandidate(candidate);

@@ -1,5 +1,5 @@
 import type { Candidate, JobPosition } from "../../types";
-import type { Database } from "./types";
+import type { Database, SessionContext } from "./types";
 import { repo } from "./repo";
 
 // Store con snapshot en memoria: envuelve `repo` (DataRepo) para que los
@@ -86,4 +86,12 @@ export async function exportJson(): Promise<string> {
 
 export async function exportCsv(): Promise<string> {
   return repo.exportCsv();
+}
+
+export async function getSessionContext(): Promise<SessionContext | null> {
+  return repo.getSessionContext();
+}
+
+export async function ensureAdminOrg(orgName?: string): Promise<{ organizationId: string }> {
+  return repo.ensureAdminOrg(orgName);
 }
