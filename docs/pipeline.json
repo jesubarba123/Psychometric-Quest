@@ -42,7 +42,8 @@
         { "label": "Fase 1: interfaz DataRepo + LocalRepo + Vitest", "status": "done" },
         { "label": "Fase 2 (E1): store snapshot + App cableado a DataRepo", "status": "done", "note": "Bucle Fable diseña → Sonnet implementa → Fable revisa; 94 unit + 6 E2E verdes" },
         { "label": "Fase 3 (E2): SupabaseRepo sesión + ensure_admin_org server-side", "status": "done", "note": "1 vuelta de review (boot no se bloquea si hydrate falla); 101 unit + 6 E2E verdes" },
-        { "label": "Fases 4–9 (E3–E8): posiciones, escritura/lectura candidato, CV a Storage, outcomes, multi-tenant", "status": "todo", "note": "Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md" }
+        { "label": "Fase 4 (E3): SupabaseRepo posiciones + invitaciones admin", "status": "done", "note": "Aprobada sin vueltas; retry ante colisión de código; 111 unit + 6 E2E verdes" },
+        { "label": "Fases 5–9 (E4–E8): escritura/lectura candidato, CV a Storage, outcomes, multi-tenant", "status": "todo", "note": "Plan maestro E1–E9 en docs/superpowers/plans/2026-07-02-plan-maestro-etapas-bucle.md" }
       ]
     },
     {
