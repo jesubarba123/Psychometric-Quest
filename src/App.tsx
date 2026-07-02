@@ -43,7 +43,9 @@ export function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    hydrate().then(() => setReady(true));
+    hydrate()
+      .catch((e) => console.error("hydrate falló (esperado en modo Supabase hasta E5):", e))
+      .finally(() => setReady(true));
   }, []);
 
   // A1 — mount-only; the internal `role` check prevents double-enter if the
